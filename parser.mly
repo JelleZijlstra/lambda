@@ -2,10 +2,11 @@
 	open Ast
 %}
 
-%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF
+%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS
 
-%type<Ast.expr> expression simple_expr apply_expr
+%type<Ast.expr> expression simple_expr apply_expr plus_expr
 %type<string> IDENTIFIER
+%type<int> INTEGER
 
 %start expression
 %%
@@ -13,6 +14,10 @@
 expression:
 	| BACKSLASH IDENTIFIER DOT expression
 								{ Abstraction($2, $4) }
+	| plus_expr					{ $1 }
+
+plus_expr:
+	apply_expr PLUS plus_expr	{ Binop(Plus, $1, $3) }
 	| apply_expr				{ $1 }
 
 apply_expr:
@@ -22,3 +27,4 @@ apply_expr:
 simple_expr:
 	| LPAREN expression RPAREN	{ $2 }
 	| IDENTIFIER				{ Var($1) }
+	| INTEGER					{ Integer($1) }
