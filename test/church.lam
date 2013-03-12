@@ -1,0 +1,28 @@
+# Church numerals
+let id = \x. x in
+let true = \a. \b. a in
+let false = \a. \b. b in
+
+let zero = \f. \x. x in
+let succ = \n. \f. \x. f (n f x) in
+let plus = \m. \n. \f. \x. m f (n f x) in
+let mult = \m. \n. \f. m (n f) in
+let exp = \m. \n. n m in
+let pred = \n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u) in
+let sub = \m. \n. (n pred) m in
+let iszero = \n. n (\x. false) true in
+
+let decode = \n. n (\x. x + 1) 0 in
+
+let one = succ zero in
+let one' = decode one in
+let two = plus one one in
+let two' = decode two in
+let four = mult two two in
+let four' = decode four in
+let sixteen = mult four four in
+let alot = exp two sixteen in
+let alot' = decode alot in
+
+# Make it print out the results
+\x. one' two' four' alot'
