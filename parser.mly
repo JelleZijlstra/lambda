@@ -2,9 +2,9 @@
 	open Ast
 %}
 
-%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
+%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS TIMES
 
-%type<Ast.expr> expression simple_expr apply_expr plus_expr
+%type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<string> IDENTIFIER
 %type<int> INTEGER
 
@@ -16,6 +16,10 @@ expression:
 								{ Abstraction($2, $4) }
 	| LET IDENTIFIER EQUALS expression IN expression
 								{ Application(Abstraction($2, $6), $4) }
+	| times_expr					{ $1 }
+
+times_expr:
+	plus_expr TIMES times_expr	{ Binop(Times, $1, $3) }
 	| plus_expr					{ $1 }
 
 plus_expr:

@@ -1,5 +1,6 @@
 type binop =
 	Plus
+	| Times
 
 type expr =
 	Var of string
@@ -10,9 +11,11 @@ type expr =
 
 let f_of_binop op = match op with
 	| Plus -> (+)
+	| Times -> ( * )
 
 let stringify_binop b = match b with
 	| Plus -> "+"
+	| Times -> "*"
 
 let rec stringify e =
 	match e with

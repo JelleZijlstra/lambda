@@ -8,6 +8,7 @@ rule token = parse
 | "\\"	{ BACKSLASH }
 | "."	{ DOT }
 | "+"	{ PLUS }
+| "*"	{ TIMES }
 | "let"	{ LET}
 | "in"	{ IN }
 | "="	{ EQUALS }
