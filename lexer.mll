@@ -8,6 +8,9 @@ rule token = parse
 | "\\"	{ BACKSLASH }
 | "."	{ DOT }
 | "+"	{ PLUS }
+| "let"	{ LET}
+| "in"	{ IN }
+| "="	{ EQUALS }
 | ['A'-'Z''a'-'z']['A'-'Z''a'-'z''\'''0'-'9']* as n
 		{ IDENTIFIER(n) } (* variable names *)
 | [' ' '\t' '\n']

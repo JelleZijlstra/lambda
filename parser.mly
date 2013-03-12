@@ -2,7 +2,7 @@
 	open Ast
 %}
 
-%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS
+%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr
 %type<string> IDENTIFIER
@@ -14,6 +14,8 @@
 expression:
 	| BACKSLASH IDENTIFIER DOT expression
 								{ Abstraction($2, $4) }
+	| LET IDENTIFIER EQUALS expression IN expression
+								{ Application(Abstraction($2, $6), $4) }
 	| plus_expr					{ $1 }
 
 plus_expr:
