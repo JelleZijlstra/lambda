@@ -19,7 +19,7 @@ let rec stringify e =
 	| Var x -> x
 	| Integer i -> string_of_int i
 	| Abstraction(x, e1) -> "\\" ^ x ^ ". " ^ stringify e1
-	| Application(Application(_, _) as e1, e2)
+	| Application(e1, (Application(_, _) as e2)) -> stringify e1 ^ " (" ^ stringify e2 ^ ")"
 	| Application(Abstraction(_, _) as e1, e2) -> "(" ^ stringify e1 ^ ") " ^ stringify e2
 	| Application(e1, e2) -> stringify e1 ^ " " ^ stringify e2
 	| Binop(op, e1, e2) -> stringify e1 ^ " " ^ stringify_binop op ^ " " ^ stringify e2
