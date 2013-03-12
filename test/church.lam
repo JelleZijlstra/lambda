@@ -24,5 +24,10 @@ let sixteen = mult four four in
 let alot = exp two sixteen in
 let alot' = decode alot in
 
+let fact' = \f. \x. ((iszero x) (\x'. one) (\x'. mult x (f f (pred x)))) id in
+let fact = fact' fact' in
+let six = fact (succ two) in
+let six' = decode six in
+
 # Make it print out the results
-\x. one' two' four' alot'
+\x. one' two' four' alot' six'
