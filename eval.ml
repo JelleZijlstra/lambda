@@ -23,7 +23,7 @@ let rec substitute code var replacement = match code with
 				Abstraction(var_name, substitute (substitute body arg (Var var_name)) var replacement)
 
 let rec eval e = match e with
-	| Var _ -> failwith "Unexpected variable"
+	| Var x -> failwith ("Unbound variable: " ^ x)
 	| Abstraction(_, _) -> e
 	| Application(e1, e2) ->
 		let e1' = eval e1 in
