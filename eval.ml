@@ -18,7 +18,7 @@ let rec substitute code var replacement = match code with
 	| Var(x) -> if x = var then replacement else Var x
 	| Application(e1, e2) -> Application(substitute e1 var replacement, substitute e2 var replacement)
 	| Integer _ -> code
-	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e1 var replacement)
+	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| Abstraction(arg, body) ->
 		if arg = var then Abstraction(arg, body)
 		else if not (is_free_variable arg replacement)
