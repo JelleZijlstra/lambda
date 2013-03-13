@@ -44,5 +44,5 @@ and eval_binop op e1 e2 =
 	let e2' = eval e2 in
 	match e1', e2' with
 	| Integer n1, Integer n2 -> Integer(f_of_binop op n1 n2)
-	| Integer _, _ -> failwith("Invalid operand to binary expression: " ^ stringify e2')
-	| _, _ -> failwith("Invalid operand to binary expression: " ^ stringify e1')
+	| Integer _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e2')
+	| _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e1')
