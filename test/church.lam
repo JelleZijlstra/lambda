@@ -30,4 +30,9 @@ let six = fact (succ two) in
 let six' = decode six in
 
 # Make it print out the results
-\x. one' two' four' alot' six'
+let x = print one' in
+let x = print two' in
+let x = print four' in
+let x = print alot' in
+print six'
+#\x. one' two' four' alot' six'

@@ -12,6 +12,8 @@ rule token = parse
 | "let"	{ LET}
 | "in"	{ IN }
 | "="	{ EQUALS }
+| "print"
+		{ PRINT }
 | ['A'-'Z''a'-'z']['A'-'Z''a'-'z''\'''0'-'9']* as n
 		{ IDENTIFIER(n) } (* variable names *)
 | [' ' '\t' '\n']

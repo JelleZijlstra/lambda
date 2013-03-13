@@ -1,8 +1,11 @@
 # Largely stolen from IMP
 MAIN=lambda
+LAMBDAC=lambdac
 CAMLCFLAGS= -g
 
-OBJS = ast.cmo lexer.cmo parser.cmo eval.cmo compile.cmo main.cmo
+OBJS = ast.cmo lexer.cmo parser.cmo util.cmo
+MAIN_OBJS = $(OBJS) eval.cmo main.cmo
+LAMBDAC_OBJS = $(OBJS) compile.cmo lambdac.cmo
 LIBS = str.cma
 
 %.cmo : %.ml
@@ -12,8 +15,11 @@ LIBS = str.cma
 	ocamlc $(CAMLCFLAGS) -c $<
 
 
-$(MAIN): $(OBJS)
-	ocamlc $(CAMLCFLAGS) -o $(MAIN) $(LIBS) $(OBJS)
+$(MAIN): $(MAIN_OBJS)
+	ocamlc $(CAMLCFLAGS) -o $(MAIN) $(LIBS) $(MAIN_OBJS)
+
+$(LAMBDAC): $(LAMBDAC_OBJS)
+	ocamlc $(CAMLCFLAGS) -o $(LAMBDAC) $(LIBS) $(LAMBDAC_OBJS)
 
 lexer.ml : lexer.mll
 	ocamllex -q $<
@@ -28,4 +34,4 @@ parser.mli : parser.mly
 	ocamlyacc -q $<
 
 clean:
-	rm -f *.cmo *.cmi lexer.ml parser.ml parser.mli $(MAIN)
+	rm -f *.cmo *.cmi lexer.ml parser.ml parser.mli $(MAIN) $(LAMBDAC)
