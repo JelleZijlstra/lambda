@@ -4,4 +4,4 @@ if Array.length Sys.argv <> 2 then
 
 let com = Util.parse_file (Sys.argv.(1)) in
 let result = Eval.eval com in
-Printf.printf "%s\n" (Ast.string_of_expr result)
+Printf.printf "Result: %s\n" (Ast.string_of_expr result)
