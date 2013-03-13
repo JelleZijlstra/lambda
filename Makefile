@@ -2,7 +2,8 @@
 MAIN=lambda
 CAMLCFLAGS= -g
 
-OBJS = ast.cmo lexer.cmo parser.cmo eval.cmo main.cmo
+OBJS = ast.cmo lexer.cmo parser.cmo eval.cmo compile.cmo main.cmo
+LIBS = str.cma
 
 %.cmo : %.ml
 	ocamlc $(CAMLCFLAGS) -c $<
@@ -12,7 +13,7 @@ OBJS = ast.cmo lexer.cmo parser.cmo eval.cmo main.cmo
 
 
 $(MAIN): $(OBJS)
-	ocamlc $(CAMLCFLAGS) -o $(MAIN) $(OBJS)
+	ocamlc $(CAMLCFLAGS) -o $(MAIN) $(LIBS) $(OBJS)
 
 lexer.ml : lexer.mll
 	ocamllex -q $<
