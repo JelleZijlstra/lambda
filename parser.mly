@@ -20,7 +20,7 @@ expression:
 	| times_expr				{ $1 }
 
 times_expr:
-	plus_expr TIMES times_expr	{ Binop(Times, $1, $3) }
+	times_expr TIMES plus_expr	{ Binop(Times, $1, $3) }
 	| plus_expr					{ $1 }
 
 plus_expr:
