@@ -1,6 +1,7 @@
 *.sublime-*
 *.cm*
 lambda
+lambdac
 parser.ml
 lexer.ml
 parser.mli
