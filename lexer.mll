@@ -14,7 +14,7 @@ rule token = parse
 | "="	{ EQUALS }
 | "print"
 		{ PRINT }
-| ['A'-'Z''a'-'z']['A'-'Z''a'-'z''\'''0'-'9']* as n
+| ['A'-'Z' 'a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
 		{ IDENTIFIER(n) } (* variable names *)
 | [' ' '\t' '\n']
 		{ token lexbuf } (* ignore whitespace *)
