@@ -111,6 +111,59 @@ let mergesort' = \mergesort. \lst. (((isnil lst) true (isnil (tail lst)))
 		merge (mergesort l) (mergesort r))) id in
 let mergesort = Z mergesort' in
 
+let bubblesort = \lst.
+	let bubble' = \bubble. \lst.
+		# lst will never be nil
+		let hd = head lst in
+		let tl = tail lst in
+		((isnil tl)
+			(\x. lst)
+			(\x.
+				let hd' = head tl in
+				let tl' = tail tl in
+				((less hd hd')
+					(\x. cons hd (bubble tl))
+					(\x. cons hd' (bubble (cons hd tl')))) id)) id in
+	let bubble = Z bubble' in
+
+	reduce (\x. bubble) lst lst in
+
+let insertionsort = \lst.
+	let insert' = \insert. \elt. \lst. ((isnil lst)
+		(\x. cons elt nil)
+		(\x.
+			let hd = head lst in
+			let tl = tail lst in
+			((less elt hd)
+				(\x. cons elt lst)
+				(\x. cons hd (insert elt tl))) id)) id in
+	let insert = Z insert' in
+	reduce insert nil lst in
+
+let printlist = map (\x. print (decode x)) in
+
+let selectionsort =
+	let smallest' = \smallest. \lst.
+		let hd = head lst in
+		let tl = tail lst in
+		((isnil tl)
+			(\x. pair hd nil)
+			(\x.
+				let p = smallest tl in
+				let small = fst p in
+				let rest = snd p in
+				((less hd small)
+					(\x. pair hd tl)
+					(\x. pair small (cons hd rest))) id)) id in
+	let smallest = Z smallest' in
+	let sort' = \sort. \lst.
+		((isnil lst)
+			(\x. lst)
+			(\x.
+				let p = smallest lst in
+				cons (fst p) (sort (snd p)))) id in
+	Z sort' in
+
 let smallerlist = filter (\elt. less elt four) mylist in
 let x = map (\x. print (decode x)) smallerlist in
 let x = print 100 in
@@ -118,13 +171,25 @@ let x = print 100 in
 let numlist = map decode mylist in
 let x = map (\x. print x) numlist in
 
-let printlist = map (\x. print (decode x)) in
 
 let x = print 100 in
 let x = printlist (qsort mylist) in
 
+let x = print 101 in
+let x = printlist (selectionsort mylist) in
 let x = print 100 in
 let x = printlist (mergesort mylist) in
+let x = print 100 in
+let x = printlist (bubblesort mylist) in
+let x = print 100 in
+let x = printlist (insertionsort mylist) in
+
+let x = print 100 in
+#let p = smallest mylist in
+#let x = print (decode (fst p)) in
+#let x = print 100 in
+#let x = printlist (snd p) in
+
 #let x = print 100 in
 #let lists = split mylist nil nil in
 #let x = printlist (fst lists) in
