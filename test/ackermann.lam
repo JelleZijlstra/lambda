@@ -83,6 +83,34 @@ let qsort' = \qsort. \lst. ((isnil lst)
 		append left (cons hd right))) id in
 let qsort = Z qsort' in
 
+let split' = \split. \lst. \l. \r. ((isnil lst)
+	(\x. pair l r)
+	(\x. split (tail lst) r (cons (head lst) l))) id in
+let split = Z split' in
+
+let merge' = \merge. \l. \r. ((isnil l)
+	(\x. r)
+	(\x. ((isnil r)
+		(\x. l)
+		(\x.
+			let lhd = head l in
+			let ltl = tail l in
+			let rhd = head r in
+			let rtl = tail r in
+			((less lhd rhd)
+				(\x. cons lhd (merge ltl r))
+				(\x. cons rhd (merge l rtl))) id)) id)) id in
+let merge = Z merge' in
+
+let mergesort' = \mergesort. \lst. (((isnil lst) true (isnil (tail lst)))
+	(\x. lst)
+	(\x.
+		let lists = split lst nil nil in
+		let l = fst lists in
+		let r = snd lists in
+		merge (mergesort l) (mergesort r))) id in
+let mergesort = Z mergesort' in
+
 let smallerlist = filter (\elt. less elt four) mylist in
 let x = map (\x. print (decode x)) smallerlist in
 let x = print 100 in
@@ -94,6 +122,19 @@ let printlist = map (\x. print (decode x)) in
 
 let x = print 100 in
 let x = printlist (qsort mylist) in
+
+let x = print 100 in
+let x = printlist (mergesort mylist) in
+#let x = print 100 in
+#let lists = split mylist nil nil in
+#let x = printlist (fst lists) in
+#let x = print 100 in
+#let x = printlist (snd lists) in
+
+#let lst1 = cons one (cons two (cons three nil)) in
+#let lst2 = cons four (cons five (cons six nil)) in
+#let merged = merge lst1 lst2 in
+#let x = printlist merged in
 
 let x = print 100 in
 
