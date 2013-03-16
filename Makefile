@@ -1,37 +1,51 @@
 # Largely stolen from IMP
 MAIN=lambda
-LAMBDAC=lambdac
+MAINOPT=lambdaopt
+CAMLC=ocamlc
 CAMLCFLAGS= -g
+CAMLOPT=ocamlopt
+CAMLOPTFLAGS=
 
-OBJS = ast.cmo lexer.cmo parser.cmo util.cmo
-MAIN_OBJS = $(OBJS) eval.cmo main.cmo
-LAMBDAC_OBJS = $(OBJS) compile.cmo lambdac.cmo
-LIBS = str.cma
+SOURCES = ast.ml parser.ml lexer.ml util.ml eval.ml compile.ml main.ml
+OBJECTS = $(SOURCES:.ml=.cmo)
+INTERFACES = $(SOURCES:.ml=.mli)
+INTERFACE_OBJECTS = $(SOURCES:.ml=.cmi)
+OPT_OBJECTS = $(SOURCES:.ml=.cmx)
 
-%.cmo : %.ml
-	ocamlc $(CAMLCFLAGS) -c $<
+LIBS=str.cma
+OPT_LIBS=str.cmxa
 
-%.cmi : %.mli
-	ocamlc $(CAMLCFLAGS) -c $<
+all: $(MAIN) $(MAINOPT)
 
+%.cmi: %.mli
+	$(CAMLC) $(CAMLCFLAGS) -c $<
 
-$(MAIN): $(MAIN_OBJS)
-	ocamlc $(CAMLCFLAGS) -o $(MAIN) $(LIBS) $(MAIN_OBJS)
+%.cmo: %.ml
+	$(CAMLC) $(CAMLCFLAGS) -c $<
 
-$(LAMBDAC): $(LAMBDAC_OBJS)
-	ocamlc $(CAMLCFLAGS) -o $(LAMBDAC) $(LIBS) $(LAMBDAC_OBJS)
+%.cmx: %.ml
+	$(CAMLOPT) $(CAMLOPTFLAGS) -c $<
 
-lexer.ml : lexer.mll
+$(MAIN): $(INTERFACE_OBJECTS) $(OBJECTS)
+	$(CAMLC) $(CAMLCFLAGS) -o $(MAIN) $(LIBS) $(OBJECTS)
+
+$(MAINOPT): $(INTERFACE_OBJECTS) $(OPT_OBJECTS)
+	$(CAMLOPT) $(CAMLOPTFLAGS) -o $(MAINOPT) $(OPT_LIBS) $(OPT_OBJECTS)
+
+lexer.ml: lexer.mll
 	ocamllex -q $<
 
-lexer.cmo : parser.cmi lexer.ml
+lexer.mli: lexer.mll
+	ocamllex -q $<
+
+lexer.cmo: parser.cmi lexer.ml
 	ocamlc $(CAMLCFLAGS) -c lexer.ml
 
-parser.ml : parser.mly
+parser.ml: parser.mly
 	ocamlyacc -q $<
 
-parser.mli : parser.mly
+parser.mli: parser.mly
 	ocamlyacc -q $<
 
 clean:
-	rm -f *.cmo *.cmi lexer.ml parser.ml parser.mli $(MAIN) $(LAMBDAC)
+	rm -f *.cmo *.cmi *.cmx lexer.ml parser.ml parser.mli $(MAIN) $(MAINOPT)

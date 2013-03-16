@@ -1,7 +1,21 @@
 (* Interpreter for the simple lambda calculus *)
-if Array.length Sys.argv <> 2 then
-	(Printf.printf "Usage: %s file\n" Sys.argv.(0); exit 1);;
+let main () =
+	let file = ref "" in
+	let do_compile = ref false in
+	let do_cbn = ref false in
 
-let com = Util.parse_file (Sys.argv.(1)) in
-let result = Eval.eval com in
-Printf.printf "Result: %s\n" (Ast.string_of_expr result)
+	let arguments = [
+		("-c", Arg.Set do_compile, "Compile rather than run the program");
+		("-n", Arg.Set do_cbn, "Use call-by-name semantics");
+		("file", Arg.Rest (fun str -> file := str), "File to run")
+	] in
+	Arg.parse arguments (fun str -> file := str) "Implementation of the untyped lambda calculus";
+
+	let com = Util.parse_file (!file) in
+	if !do_compile
+	then let result = Compile.compile com in
+		Printf.printf "%s\n" result
+	else let result = (if !do_cbn then Eval.eval_cbn else Eval.eval_cbv) com in
+		Printf.printf "Result: %s\n" (Ast.string_of_expr result)
+
+let _ = main();;
