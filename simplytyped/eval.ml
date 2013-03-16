@@ -16,6 +16,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Integer _ -> false
 	| Binop(_, e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Unop(_, e) -> is_free_variable var e
+	| Fix e -> is_free_variable var e
 
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
@@ -23,6 +24,7 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Integer _ -> code
 	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| Unop(op, e) -> Unop(op, substitute e var replacement)
+	| Fix e -> Fix(substitute e var replacement)
 	| Abstraction(arg, t, body) ->
 		if arg = var then Abstraction(arg, t, body)
 		else if not (is_free_variable arg replacement)
@@ -52,11 +54,14 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		let e2' = match s with
 			| CBV -> eval e2 s
 			| CBN -> e2 in
-		match e1' with
+		(match e1' with
 		| Abstraction(arg, _, body) ->
 			let substituted = substitute body arg e2' in
 			eval substituted s
-		| _ -> failwith "This expression is not a function; it cannot be applied"
+		| _ -> failwith "This expression is not a function; it cannot be applied")
+	| Fix(Abstraction(arg, _, body)) ->
+		eval (substitute body arg e) s
+	| Fix _ -> failwith "Invalid use of fix"
 
 let eval_cbv e = eval e CBV
 let eval_cbn e = eval e CBN

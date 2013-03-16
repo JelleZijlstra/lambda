@@ -2,7 +2,8 @@
 	open Ast
 %}
 
-%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS TIMES PRINT INT ARROW COLON
+%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
+%token TIMES PRINT INT ARROW COLON FIX REC
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<string> IDENTIFIER
@@ -17,7 +18,10 @@ expression:
 								{ Abstraction($2, $4, $6) }
 	| LET IDENTIFIER COLON type EQUALS expression IN expression
 								{ Application(Abstraction($2, $4, $8), $6) }
+	| LET REC IDENTIFIER COLON type EQUALS expression IN expression
+								{ Application(Abstraction($3, $5, $9), Fix(Abstraction($3, $5, $7))) }
 	| PRINT expression			{ Unop(Print, $2) }
+	| FIX expression			{ Fix($2) }
 	| times_expr				{ $1 }
 
 times_expr:

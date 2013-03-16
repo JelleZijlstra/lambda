@@ -16,6 +16,7 @@ type expr =
 	| Integer of int
 	| Binop of binop * expr * expr
 	| Unop of unop * expr
+	| Fix of expr
 
 let rec string_of_type t = match t with
 	| Int -> "int"
@@ -46,3 +47,4 @@ let rec string_of_expr e =
 	| Application(e1, e2) -> string_of_expr e1 ^ " " ^ string_of_expr e2
 	| Binop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop op ^ " " ^ string_of_expr e2
 	| Unop(op, e) -> string_of_unop op ^ " " ^ string_of_expr e
+	| Fix e -> "fix " ^ string_of_expr e

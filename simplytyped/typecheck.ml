@@ -39,6 +39,11 @@ let rec get_type (e : expr) (c : context) : type_or_error =
 	| Abstraction(arg, t, body) -> (match get_type body (TypingContext.add arg t c) with
 		| Error e -> Error e
 		| Type t' -> Type(Function(t, t')))
+	| Fix e -> (match get_type e c with
+		| Error e -> Error e
+		| Type(Function(t1, t2)) when (t1 = t2) -> Type t1
+		| Type t -> Error("Fix expects an expression of type t -> t, but this expression has type "
+			^ string_of_type t))
 
 let typecheck e =
 	match get_type e TypingContext.empty with

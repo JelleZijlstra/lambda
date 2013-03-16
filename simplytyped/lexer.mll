@@ -17,6 +17,8 @@ rule token = parse
 | ":"	{ COLON }
 | "print"
 		{ PRINT }
+| "fix"	{ FIX }
+| "rec"	{ REC }
 | ['A'-'Z' 'a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
 		{ IDENTIFIER(n) } (* variable names *)
 | [' ' '\t' '\n']

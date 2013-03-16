@@ -10,5 +10,6 @@ let rec compile_rec e = match e with
 	| Integer n -> string_of_int n
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_binop op ^ compile_rec e2 ^ ")"
 	| Unop(Print, e) -> "((function(x) {console.log(x);return x;})(" ^ compile_rec e ^ "))"
+	| Fix e -> failwith "Need to think about it"
 
 let compile e = "console.log(\"Result: \" + " ^ compile_rec e ^ ");"

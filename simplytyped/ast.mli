@@ -16,6 +16,7 @@ type expr =
 	| Integer of int
 	| Binop of binop * expr * expr
 	| Unop of unop * expr
+	| Fix of expr
 
 val string_of_type : ltype -> string
 
