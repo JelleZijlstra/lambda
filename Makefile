@@ -48,4 +48,4 @@ parser.mli: parser.mly
 	ocamlyacc -q $<
 
 clean:
-	rm -f *.cmo *.cmi *.cmx lexer.ml parser.ml parser.mli $(MAIN) $(MAINOPT)
+	rm -f *.cmo *.cmi *.cmx *.o lexer.ml parser.ml parser.mli $(MAIN) $(MAINOPT)
