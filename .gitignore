@@ -5,3 +5,5 @@ lambdac
 parser.ml
 lexer.ml
 parser.mli
+*.o
+lambdaopt
