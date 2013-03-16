@@ -64,6 +64,11 @@ let less' = \less. \m. \n. ((iszero m) (\x. not (iszero n)) (\x. ((iszero n)
 	(\x. less (pred m) (pred n))) id)) id in
 let less = Z less' in
 
+let greater = \m. \n. less n m in
+let leq = \m. \n. not (greater m n) in
+let geq = \m. \n. not (less m n) in
+let equals = \m. \n. (less m n) false (not (greater m n)) in
+
 let reversetwo = \revtwo. \lst. \accum. ((isnil lst)
 	(\x. accum)
 	(\x. revtwo (tail lst) (cons (head lst) accum))) id
