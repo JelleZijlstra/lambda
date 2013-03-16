@@ -1,0 +1,3 @@
+let omega = (\x. x x) (\x. x x) in
+let f = \x. \x. x in
+f omega
