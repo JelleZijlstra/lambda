@@ -66,6 +66,17 @@ let rec get_type (e : expr) (c : context) : type_or_error =
 			let new_cs = ConstraintSet.add (Equals(t1, Bool)) (ConstraintSet.add (Equals(t2, t3)) new_cs) in
 			Type(t2, new_cs)
 		| Error e, _, _ | _, Error e, _ | _, _, Error e -> Error e)
+	| Pair(e1, e2) -> (match get_type e1 c, get_type e2 c with
+		| Type(t1, cs1), Type(t2, cs2) -> Type(Product(t1, t2), ConstraintSet.union cs1 cs2)
+		| Error e, _ | _, Error e -> Error e)
+	| Projection(b, e) -> (match get_type e c with
+		| Error e -> Error e
+		| Type(t, cs) ->
+			let left_typevar = Ast.new_typevar() in
+			let right_typevar = Ast.new_typevar() in
+			let new_constraint = Equals(t, Product(left_typevar, right_typevar)) in
+			let my_type = if b then right_typevar else left_typevar in
+			Type(my_type, ConstraintSet.add new_constraint cs))
 
 exception ImpossibleConstraint of string
 
@@ -78,6 +89,7 @@ let rec replace_in_type typevar new_type t =
 	| Typevar t' when t' = typevar -> new_type
 	| Typevar _ | Int | Bool -> t
 	| Function(t1, t2) -> Function(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
+	| Product(t1, t2) -> Product(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 
 let replace_type typevar new_type =
 	set_map (fun (Equals(t1, t2)) ->
@@ -86,6 +98,7 @@ let replace_type typevar new_type =
 let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| Typevar t' -> t = t'
 	| Int | Bool -> false
+	| Product(t1, t2)
 	| Function(t1, t2) -> is_free_variable t t1 || is_free_variable t t2
 
 let rec unify (cs : ConstraintSet.t) : substitution =
@@ -98,6 +111,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 			let new_cs = replace_type t t' new_set in
 			let rest = unify new_cs in
 			TypingContext.add t t' rest
+		| Equals(Product(t0, t1), Product(t0', t1'))
 		| Equals(Function(t0, t1), Function(t0', t1')) ->
 			let new_cs = ConstraintSet.add (Equals(t0, t0')) new_set in
 			let new_cs = ConstraintSet.add (Equals(t1, t1')) new_cs in

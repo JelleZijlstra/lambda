@@ -10,6 +10,7 @@ rule token = parse
 | "+"	{ PLUS }
 | "-"	{ MINUS }
 | "*"	{ TIMES }
+| ","	{ COMMA }
 | "let"	{ LET}
 | "in"	{ IN }
 | "="	{ EQUALS }
@@ -29,6 +30,8 @@ rule token = parse
 		{ THEN }
 | "else"
 		{ ELSE }
+| "fst"	{ FST }
+| "snd"	{ SND }
 | ">"	{ GREATER }
 | "<"	{ LESS }
 | ['A'-'Z' 'a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n

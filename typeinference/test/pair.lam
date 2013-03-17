@@ -1,0 +1,4 @@
+let x = (1, \x. 2) in
+let y = print (fst x) in
+let y = print ((snd x) 42) in
+x

@@ -19,6 +19,8 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| If(e1, e2, e3) -> is_free_variable var e1 || is_free_variable var e2 || is_free_variable var e3
 	| Unop(_, e) -> is_free_variable var e
 	| Fix e -> is_free_variable var e
+	| Pair(e1, e2) -> is_free_variable var e1 || is_free_variable var e2
+	| Projection(_, e) -> is_free_variable var e
 
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
@@ -35,6 +37,8 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 			then Abstraction(arg, t, substitute body var replacement)
 			else let var_name = get_unique_var_name () in
 				Abstraction(var_name, t, substitute (substitute body arg (Var var_name)) var replacement)
+	| Pair(e1, e2) -> Pair(substitute e1 var replacement, substitute e2 var replacement)
+	| Projection(b, e) -> Projection(b, substitute e var replacement)
 
 
 let rec eval (e : expr) (s : semantics) : expr = match e with
@@ -78,6 +82,13 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		| Boolean true -> eval e2 s
 		| Boolean false -> eval e3 s
 		| _ -> failwith "If block must contain a bool")
+	| Pair(e1, e2) ->
+		let e1' = eval e1 s in
+		let e2' = eval e2 s in
+		Pair(e1', e2')
+	| Projection(b, e) -> (match eval e s with
+		| Pair(e1, e2) -> if b then e2 else e1
+		| _ -> failwith "This expression is not a product; it cannot be projected")
 
 let eval_cbv e = eval e CBV
 let eval_cbn e = eval e CBN

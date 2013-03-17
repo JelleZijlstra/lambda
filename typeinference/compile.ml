@@ -23,5 +23,8 @@ let rec compile_rec e = match e with
 	| If(e1, e2, e3) -> "((" ^ compile_rec e1 ^ ") ? (" ^ compile_rec e2 ^ ") : (" ^ compile_rec e3 ^ "))"
 	| Boolean true -> "true"
 	| Boolean false -> "false"
+	| Pair(e1, e2) -> "[" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ "]"
+	| Projection(false, e) -> "(" ^ compile_rec e ^ "[0])"
+	| Projection(true, e) -> "(" ^ compile_rec e ^ "[1])"
 
 let compile e = "console.log(\"Result: \" + " ^ compile_rec e ^ ");"

@@ -4,6 +4,7 @@
 
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
+%token COMMA FST SND
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<string> IDENTIFIER
@@ -27,6 +28,8 @@ expression:
 								{ Application(Abstraction($3, new_typevar(), $7), Fix(Abstraction($3, new_typevar(), $5))) }
 	| LET REC IDENTIFIER COLON type EQUALS expression IN expression
 								{ Application(Abstraction($3, $5, $9), Fix(Abstraction($3, $5, $7))) }
+	| FST expression			{ Projection(false, $2) }
+	| SND expression			{ Projection(true, $2) }
 	| IF expression THEN expression ELSE expression
 								{ If($2, $4, $6) }
 	| PRINT expression			{ Unop(Print, $2) }
@@ -59,6 +62,8 @@ simple_expr:
 	| IDENTIFIER				{ Var($1) }
 	| INTEGER					{ Integer($1) }
 	| BOOL						{ Boolean($1) }
+	| LPAREN expression COMMA expression RPAREN
+								{ Pair($2, $4) }
 
 type:
 	| simple_type ARROW type	{ Function($1, $3) }

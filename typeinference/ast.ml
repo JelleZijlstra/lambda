@@ -16,6 +16,7 @@ type ltype =
 	| Bool
 	| Function of ltype * ltype
 	| Typevar of string
+	| Product of ltype * ltype
 
 type expr =
 	Var of string
@@ -28,6 +29,8 @@ type expr =
 	| If of expr * expr * expr
 	| Unop of unop * expr
 	| Fix of expr
+	| Pair of expr * expr
+	| Projection of bool * expr
 
 let rec string_of_type t = match t with
 	| Int -> "int"
@@ -35,6 +38,7 @@ let rec string_of_type t = match t with
 	| Function(Function(_, _) as f, t) -> "(" ^ string_of_type f ^ ") -> " ^ string_of_type t
 	| Function(a, b) -> string_of_type a ^ " -> " ^ string_of_type b
 	| Typevar t -> "'" ^ t
+	| Product(a, b) -> "(" ^ string_of_type a ^ " * " ^ string_of_type b ^ ")"
 
 let f_of_binop op = match op with
 	| Plus -> (+)
@@ -77,6 +81,9 @@ let rec string_of_expr e =
 	| Fix e -> "fix " ^ string_of_expr e
 	| If(e1, e2, e3) -> "if " ^ string_of_expr e1 ^ " then " ^ string_of_expr e2 ^ " else " ^ string_of_expr e3
 	| Boolbinop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_bool_binop op ^ " " ^ string_of_expr e2
+	| Pair(e1, e2) -> "(" ^ string_of_expr e1 ^ ", " ^ string_of_expr e2 ^ ")"
+	| Projection(false, e) -> "fst " ^ string_of_expr e
+	| Projection(true, e) -> "snd " ^ string_of_expr e
 
 let new_typevar =
 	let current = ref 0 in

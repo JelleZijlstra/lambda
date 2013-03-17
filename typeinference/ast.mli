@@ -16,6 +16,7 @@ type ltype =
 	| Bool
 	| Function of ltype * ltype
 	| Typevar of string
+	| Product of ltype * ltype
 
 type expr =
 	Var of string
@@ -28,6 +29,8 @@ type expr =
 	| If of expr * expr * expr
 	| Unop of unop * expr
 	| Fix of expr
+	| Pair of expr * expr
+	| Projection of bool * expr
 
 val string_of_type : ltype -> string
 
