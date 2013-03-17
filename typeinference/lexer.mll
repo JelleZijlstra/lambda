@@ -15,6 +15,10 @@ rule token = parse
 | "in"	{ IN }
 | "="	{ EQUALS }
 | "int" { INT }
+| "bool"
+		{ BOOL }
+| "unit"
+		{ UNIT }
 | "->"	{ ARROW }
 | ":"	{ COLON }
 | "print"
@@ -22,9 +26,9 @@ rule token = parse
 | "fix"	{ FIX }
 | "rec"	{ REC }
 | "true"
-		{ BOOL true }
+		{ BOOLEAN true }
 | "false"
-		{ BOOL false }
+		{ BOOLEAN false }
 | "if"	{ IF }
 | "then"
 		{ THEN }

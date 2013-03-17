@@ -4,13 +4,13 @@
 
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
-%token COMMA FST SND
+%token COMMA FST SND UNIT BOOLEAN
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<string> IDENTIFIER
 %type<int> INTEGER
 %type<Ast.ltype> type
-%type<bool> BOOL
+%type<bool> BOOLEAN
 
 %start expression
 %%
@@ -61,9 +61,10 @@ simple_expr:
 	| LPAREN expression RPAREN	{ $2 }
 	| IDENTIFIER				{ Var($1) }
 	| INTEGER					{ Integer($1) }
-	| BOOL						{ Boolean($1) }
+	| BOOLEAN					{ Boolean($1) }
 	| LPAREN expression COMMA expression RPAREN
 								{ Pair($2, $4) }
+	| LPAREN RPAREN				{ Unit }
 
 type:
 	| product_type ARROW type	{ Function($1, $3) }
@@ -77,3 +78,5 @@ product_type:
 simple_type:
 	| LPAREN type RPAREN		{ $2 }
 	| INT						{ Int }
+	| BOOL						{ Bool }
+	| UNIT						{ Uni }

@@ -13,7 +13,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Var x -> var = x
 	| Application(e1, e2) -> (is_free_variable var e1) || (is_free_variable var e2)
 	| Abstraction(arg, _, body) -> (arg <> var) && (is_free_variable var body)
-	| Integer _ | Boolean _ -> false
+	| Integer _ | Boolean _ | Unit -> false
 	| Binop(_, e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Boolbinop(_, e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| If(e1, e2, e3) -> is_free_variable var e1 || is_free_variable var e2 || is_free_variable var e3
@@ -25,7 +25,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
 	| Application(e1, e2) -> Application(substitute e1 var replacement, substitute e2 var replacement)
-	| Integer _ | Boolean _ -> code
+	| Integer _ | Boolean _ | Unit -> code
 	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| Boolbinop(op, e1, e2) -> Boolbinop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| If(e1, e2, e3) -> If(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
@@ -46,6 +46,7 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 	| Abstraction(_, _, _) -> e
 	| Integer n -> Integer n
 	| Boolean b -> Boolean b
+	| Unit -> Unit
 	| Binop(op, e1, e2) ->
 		let e1' = eval e1 s in
 		let e2' = eval e2 s in

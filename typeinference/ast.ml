@@ -14,6 +14,7 @@ type unop =
 type ltype =
 	| Int
 	| Bool
+	| Uni
 	| Function of ltype * ltype
 	| Typevar of string
 	| Product of ltype * ltype
@@ -31,10 +32,12 @@ type expr =
 	| Fix of expr
 	| Pair of expr * expr
 	| Projection of bool * expr
+	| Unit
 
 let rec string_of_type t = match t with
 	| Int -> "int"
 	| Bool -> "bool"
+	| Uni -> "unit"
 	| Function(Function(_, _) as f, t) -> "(" ^ string_of_type f ^ ") -> " ^ string_of_type t
 	| Function(a, b) -> string_of_type a ^ " -> " ^ string_of_type b
 	| Typevar t -> "'" ^ t
@@ -69,6 +72,7 @@ let string_of_unop op = match op with
 let rec string_of_expr e =
 	match e with
 	| Var x -> x
+	| Unit -> "()"
 	| Integer i -> string_of_int i
 	| Boolean true -> "true"
 	| Boolean false -> "false"

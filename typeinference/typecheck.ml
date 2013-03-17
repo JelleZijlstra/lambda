@@ -24,6 +24,7 @@ let rec get_type (e : expr) (c : context) : type_or_error =
 	match e with
 	| Integer _ -> Type(Int, em)
 	| Boolean _ -> Type(Bool, em)
+	| Unit -> Type(Uni, em)
 	| Var x ->
 		(try Type(TypingContext.find x c, em) with Not_found -> Error("Unbound variable: " ^ x))
 	| Binop(_, e1, e2) -> (match get_type e1 c, get_type e2 c with
@@ -87,7 +88,7 @@ let set_map f s = ConstraintSet.fold (fun elt s -> ConstraintSet.add (f elt) s) 
 let rec replace_in_type typevar new_type t =
 	match t with
 	| Typevar t' when t' = typevar -> new_type
-	| Typevar _ | Int | Bool -> t
+	| Typevar _ | Int | Bool | Uni -> t
 	| Function(t1, t2) -> Function(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| Product(t1, t2) -> Product(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 
@@ -97,7 +98,7 @@ let replace_type typevar new_type =
 
 let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| Typevar t' -> t = t'
-	| Int | Bool -> false
+	| Int | Bool | Uni -> false
 	| Product(t1, t2)
 	| Function(t1, t2) -> is_free_variable t t1 || is_free_variable t t2
 

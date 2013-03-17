@@ -14,6 +14,7 @@ type unop =
 type ltype =
 	| Int
 	| Bool
+	| Uni
 	| Function of ltype * ltype
 	| Typevar of string
 	| Product of ltype * ltype
@@ -31,6 +32,7 @@ type expr =
 	| Fix of expr
 	| Pair of expr * expr
 	| Projection of bool * expr
+	| Unit
 
 val string_of_type : ltype -> string
 
