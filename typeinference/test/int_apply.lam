@@ -1,0 +1,1 @@
+(\x : (int -> int) -> int -> int. 42) (\x : int -> int. x)
