@@ -29,3 +29,23 @@ let rec compile_rec e = match e with
 	| Unit -> "null"
 
 let compile e = "console.log(\"Result: \" + " ^ compile_rec e ^ ");"
+
+let rec compile_rec e = match e with
+	| Var x -> translate_var x
+	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
+	| Abstraction(arg, _, body) -> "(fun " ^ translate_var arg ^ " -> " ^ compile_rec body ^ ")"
+	| Integer n -> string_of_int n
+	| Boolean true -> "true"
+	| Boolean false -> "false"
+	| Unit -> "()"
+	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_binop op ^ compile_rec e2 ^ ")"
+	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
+	| Unop(Print, e) -> "(let e = " ^ compile_rec e ^ " in Printf.printf \"%d\\n\" e; e)"
+	| If(e1, e2, e3) -> "(if " ^ compile_rec e1 ^ " then " ^ compile_rec e2 ^ " else " ^ compile_rec e3 ^ ")"
+	| Fix(Abstraction(arg, t, body)) -> "(let rec " ^ translate_var arg ^ " = " ^ compile_rec body ^ " in " ^ translate_var arg ^ ")"
+	| Fix _ -> failwith "Impossible"
+	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
+	| Projection(false, e) -> "(fst " ^ compile_rec e ^ ")"
+	| Projection(true, e) -> "(snd " ^ compile_rec e ^ ")"
+
+let compile_ml e = "let _ = Printf.printf \"%d\\n\" (" ^ compile_rec e ^ ");;"

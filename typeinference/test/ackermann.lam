@@ -4,6 +4,6 @@ let rec ackermann = \m. \n. if m = 0
 		then ackermann (m - 1) 1
 		else ackermann (m - 1) (ackermann m (n - 1)) in
 
-let x = print (ackermann 3 9)
+let x = print (ackermann 3 6)
 in
 x
