@@ -66,7 +66,12 @@ simple_expr:
 								{ Pair($2, $4) }
 
 type:
-	| simple_type ARROW type	{ Function($1, $3) }
+	| product_type ARROW type	{ Function($1, $3) }
+	| product_type				{ $1 }
+
+product_type:
+	| simple_type TIMES product_type
+								{ Product($1, $3) }
 	| simple_type				{ $1 }
 
 simple_type:
