@@ -1,0 +1,52 @@
+let id = \x. x in
+let true = \a. \b. a in
+let false = \a. \b. b in
+let not = \m. m (\a. \b. b) (\a. \b. a) in
+
+let zero = \f. \x. x in
+let succ = \n. \f. \x. f (n f x) in
+let plus = \m. \n. \f. \x. m f (n f x) in
+let mult = \m. \n. \f. m (n f) in
+let exp = \m. \n. n m in
+let pred = \n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u) in
+let sub = \m. \n. (n pred) m in
+let iszero = \n. n (\x. false) true in
+
+let decode = \n. n (\x. x + 1) 0 in
+
+let Z = \f. (\x. f (\y. x x y)) (\x. f (\y. x x y)) in
+
+let pair = \x. \y. \z. z x y in
+let fst = \p. p true in
+let snd = \p. p false in
+
+let one = succ zero in
+let two = succ one in
+let three = succ (succ (succ zero)) in
+let four = succ three in
+let five = succ four in
+let six = succ five in
+let ten = mult five two in
+
+let less' = \less. \m. \n. ((iszero m) (\x. not (iszero n)) (\x. ((iszero n)
+	(\x. false)
+	(\x. less (pred m) (pred n))) id)) id in
+let less = Z less' in
+
+# Given two numbers m and n, gives a pair of the quotient and remainder. Enters
+# an infinite loop if n = 0.
+# Algorithm from http://en.wikipedia.org/wiki/Division_algorithm#Division_by_repeated_subtraction
+let divmod = \m. \n.
+	let inner_div' = \inner_div. \q. \r.
+		((less r n)
+			(\x. pair q r)
+			(\x. inner_div (succ q) (sub r n))) id in
+	let inner_div = Z inner_div' in
+	inner_div zero m in
+
+let divide = \m. \n. fst (divmod m n) in
+
+let x = print (decode (divide (mult ten ten) ten)) in
+let x = print (decode (divide four two)) in
+
+x
