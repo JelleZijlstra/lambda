@@ -1,0 +1,2 @@
+let rec x = (1, x) in
+snd x

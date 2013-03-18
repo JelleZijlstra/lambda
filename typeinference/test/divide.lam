@@ -1,0 +1,33 @@
+let None = inl () in
+let Some = \val. inr val in
+
+# Given two numbers m and n, gives a pair of the quotient and remainder. Enters
+# an infinite loop if n = 0.
+# Algorithm from http://en.wikipedia.org/wiki/Division_algorithm#Division_by_repeated_subtraction
+let rec divmod = \m. \n.
+	if n < 0 then
+		let res = divmod m (0 - n) in
+		(0 - (fst res), snd res)
+	else if m < 0 then
+		let res = divmod (0 - m) n in
+		let r = snd res in
+		if r = 0 then (0 - (fst res), 0) else (0 - (fst res) - 1, n - r)
+	else
+		let rec inner_div = \q. \r.
+			if n > r then (q, r) else
+				inner_div (q + 1) (r - n) in
+		inner_div 0 m in
+
+let divide = \m. \n. if n = 0 then None else Some(fst(divmod m n)) in
+
+let x = case divide 100 10 of \x. 0 | \x. print x in
+
+let x = case divide 4 2 of \x. 0 | \x. print x in
+
+let x = case divide 3 0 of \x. 0 | \x. print x in
+
+let x = case divide 145 12 of \x. 0 | \x. print x in
+
+let x = case divide 155 12 of \x. 0 | \x. print x in
+
+x

@@ -1,0 +1,20 @@
+let none = inl () in
+let some = \val. inr val in
+
+let nil = inl () in
+let cons = \hd. \tl. inr (hd, tl) in
+let rec map = \f. \lst. case lst of
+	\x. nil
+	| \hdtl. cons (f (fst hdtl)) (map f (snd hdtl)) in
+
+let hd = \lst. case lst of \x. none | \x. some (fst x) in
+let tl = \lst. case lst of \x. none | \x. some (snd x) in
+
+let print_hd = \lst. case hd lst of \x. 0 | \x. print x in
+
+let print_list = map (\x. print x) in
+
+let lst = cons 3 (cons 4 (cons 2 nil)) in
+let x = print_list lst in
+let x = print_hd lst in
+lst
