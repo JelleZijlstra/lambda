@@ -18,6 +18,7 @@ type ltype =
 	| Function of ltype * ltype
 	| Typevar of string
 	| Product of ltype * ltype
+	| Sum of ltype * ltype
 
 type expr =
 	Var of string
@@ -32,6 +33,8 @@ type expr =
 	| Fix of expr
 	| Pair of expr * expr
 	| Projection of bool * expr
+	| Case of expr * expr * expr
+	| Injection of bool * expr
 	| Unit
 
 let rec string_of_type t = match t with
@@ -42,6 +45,7 @@ let rec string_of_type t = match t with
 	| Function(a, b) -> string_of_type a ^ " -> " ^ string_of_type b
 	| Typevar t -> "'" ^ t
 	| Product(a, b) -> "(" ^ string_of_type a ^ " * " ^ string_of_type b ^ ")"
+	| Sum(a, b) -> "(" ^ string_of_type a ^ " | " ^ string_of_type b ^ ")"
 
 let f_of_binop op = match op with
 	| Plus -> (+)
@@ -88,6 +92,9 @@ let rec string_of_expr e =
 	| Pair(e1, e2) -> "(" ^ string_of_expr e1 ^ ", " ^ string_of_expr e2 ^ ")"
 	| Projection(false, e) -> "fst " ^ string_of_expr e
 	| Projection(true, e) -> "snd " ^ string_of_expr e
+	| Case(e1, e2, e3) -> "case " ^ string_of_expr e1 ^ " of " ^ string_of_expr e2 ^ " | " ^ string_of_expr e3
+	| Injection(false, e) -> "inl " ^ string_of_expr e
+	| Injection(true, e) -> "inr " ^ string_of_expr e
 
 let new_typevar =
 	let current = ref 0 in

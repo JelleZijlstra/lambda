@@ -36,6 +36,12 @@ rule token = parse
 		{ ELSE }
 | "fst"	{ FST }
 | "snd"	{ SND }
+| "case"
+		{ CASE }
+| "of"	{ OF }
+| "|"	{ BAR }
+| "inl"	{ INL }
+| "inr"	{ INR }
 | ">"	{ GREATER }
 | "<"	{ LESS }
 | ['A'-'Z' 'a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n

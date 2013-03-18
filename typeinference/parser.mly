@@ -4,7 +4,7 @@
 
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
-%token COMMA FST SND UNIT BOOLEAN
+%token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<string> IDENTIFIER
@@ -32,6 +32,10 @@ expression:
 	| SND expression			{ Projection(true, $2) }
 	| IF expression THEN expression ELSE expression
 								{ If($2, $4, $6) }
+	| CASE expression OF expression BAR expression
+								{ Case($2, $4, $6) }
+	| INL expression			{ Injection(false, $2) }
+	| INR expression			{ Injection(true, $2) }
 	| PRINT expression			{ Unop(Print, $2) }
 	| FIX expression			{ Fix($2) }
 	| equals_expr				{ $1 }

@@ -78,6 +78,23 @@ let rec get_type (e : expr) (c : context) : type_or_error =
 			let new_constraint = Equals(t, Product(left_typevar, right_typevar)) in
 			let my_type = if b then right_typevar else left_typevar in
 			Type(my_type, ConstraintSet.add new_constraint cs))
+	| Injection(b, e) -> (match get_type e c with
+		| Error e -> Error e
+		| Type(t, cs) ->
+			let other_typevar = Ast.new_typevar() in
+			let my_type = if b then Sum(other_typevar, t) else Sum(t, other_typevar) in
+			Type(my_type, cs))
+	| Case(e1, e2, e3) -> (match get_type e1 c, get_type e2 c, get_type e3 c with
+		| Error e, _, _ | _, Error e, _ | _, _, Error e -> Error e
+		| Type(t1, cs1), Type(t2, cs2), Type(t3, cs3) ->
+			let tv2a = Ast.new_typevar() in
+			let tv3a = Ast.new_typevar() in
+			let tv_res = Ast.new_typevar() in
+			let new_cs = ConstraintSet.union cs1 (ConstraintSet.union cs2 cs3) in
+			let with_sum = ConstraintSet.add (Equals(t1, Sum(tv2a, tv3a))) new_cs in
+			let with_left = ConstraintSet.add (Equals(t2, Function(tv2a, tv_res))) with_sum in
+			let with_right = ConstraintSet.add (Equals(t3, Function(tv3a, tv_res))) with_left in
+			Type(tv_res, with_right))
 
 exception ImpossibleConstraint of string
 
@@ -91,6 +108,7 @@ let rec replace_in_type typevar new_type t =
 	| Typevar _ | Int | Bool | Uni -> t
 	| Function(t1, t2) -> Function(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| Product(t1, t2) -> Product(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
+	| Sum(t1, t2) -> Sum(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 
 let replace_type typevar new_type =
 	set_map (fun (Equals(t1, t2)) ->
@@ -100,6 +118,7 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| Typevar t' -> t = t'
 	| Int | Bool | Uni -> false
 	| Product(t1, t2)
+	| Sum(t1, t2)
 	| Function(t1, t2) -> is_free_variable t t1 || is_free_variable t t2
 
 let rec unify (cs : ConstraintSet.t) : substitution =
@@ -113,6 +132,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 			let rest = unify new_cs in
 			TypingContext.add t t' rest
 		| Equals(Product(t0, t1), Product(t0', t1'))
+		| Equals(Sum(t0, t1), Sum(t0', t1'))
 		| Equals(Function(t0, t1), Function(t0', t1')) ->
 			let new_cs = ConstraintSet.add (Equals(t0, t0')) new_set in
 			let new_cs = ConstraintSet.add (Equals(t1, t1')) new_cs in

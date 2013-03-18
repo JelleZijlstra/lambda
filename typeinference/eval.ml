@@ -11,16 +11,18 @@ let get_unique_var_name : unit -> string =
 
 let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Var x -> var = x
-	| Application(e1, e2) -> (is_free_variable var e1) || (is_free_variable var e2)
+	| Application(e1, e2)
+	| Pair(e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Abstraction(arg, _, body) -> (arg <> var) && (is_free_variable var body)
 	| Integer _ | Boolean _ | Unit -> false
-	| Binop(_, e1, e2) -> is_free_variable var e1 || is_free_variable var e2
+	| Binop(_, e1, e2)
 	| Boolbinop(_, e1, e2) -> is_free_variable var e1 || is_free_variable var e2
+	| Case(e1, e2, e3)
 	| If(e1, e2, e3) -> is_free_variable var e1 || is_free_variable var e2 || is_free_variable var e3
 	| Unop(_, e) -> is_free_variable var e
 	| Fix e -> is_free_variable var e
-	| Pair(e1, e2) -> is_free_variable var e1 || is_free_variable var e2
-	| Projection(_, e) -> is_free_variable var e
+	| Projection(_, e)
+	| Injection(_, e) -> is_free_variable var e
 
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
@@ -39,6 +41,8 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 				Abstraction(var_name, t, substitute (substitute body arg (Var var_name)) var replacement)
 	| Pair(e1, e2) -> Pair(substitute e1 var replacement, substitute e2 var replacement)
 	| Projection(b, e) -> Projection(b, substitute e var replacement)
+	| Injection(b, e) -> Injection(b, substitute e var replacement)
+	| Case(e1, e2, e3) -> Case(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
 
 
 let rec eval (e : expr) (s : semantics) : expr = match e with
@@ -90,6 +94,11 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 	| Projection(b, e) -> (match eval e s with
 		| Pair(e1, e2) -> if b then e2 else e1
 		| _ -> failwith "This expression is not a product; it cannot be projected")
+	| Injection(b, e) -> Injection(b, eval e s)
+	| Case(e1, e2, e3) -> (match eval e1 s with
+		| Injection(false, e') -> eval (Application(e2, e')) s
+		| Injection(true, e') -> eval (Application(e3, e')) s
+		| _ -> failwith "This expression is not a sum; it cannot be matched on")
 
 let eval_cbv e = eval e CBV
 let eval_cbn e = eval e CBN

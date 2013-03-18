@@ -18,6 +18,7 @@ type ltype =
 	| Function of ltype * ltype
 	| Typevar of string
 	| Product of ltype * ltype
+	| Sum of ltype * ltype
 
 type expr =
 	Var of string
@@ -32,6 +33,8 @@ type expr =
 	| Fix of expr
 	| Pair of expr * expr
 	| Projection of bool * expr
+	| Case of expr * expr * expr
+	| Injection of bool * expr
 	| Unit
 
 val string_of_type : ltype -> string

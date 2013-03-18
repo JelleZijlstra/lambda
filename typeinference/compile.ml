@@ -27,6 +27,9 @@ let rec compile_rec e = match e with
 	| Projection(false, e) -> "(" ^ compile_rec e ^ "[0])"
 	| Projection(true, e) -> "(" ^ compile_rec e ^ "[1])"
 	| Unit -> "null"
+	| Injection(b, e) -> "[" ^ (if b then "true" else "false") ^ ", " ^ compile_rec e ^ "]"
+	| Case(e1, e2, e3) -> "((function(x) { return x[0] ? (" ^ compile_rec e3 ^ "(x[1])) : ("
+		^ compile_rec e2 ^ "(x[1])); })(" ^ compile_rec e1 ^ "))"
 
 let compile e = "console.log(\"Result: \" + " ^ compile_rec e ^ ");"
 
@@ -47,5 +50,7 @@ let rec compile_rec e = match e with
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(fst " ^ compile_rec e ^ ")"
 	| Projection(true, e) -> "(snd " ^ compile_rec e ^ ")"
+	| Injection(b, e) -> failwith "Not implemented"
+	| Case(e1, e2, e3) -> failwith "Not implemented"
 
 let compile_ml e = "let _ = Printf.printf \"%d\\n\" (" ^ compile_rec e ^ ");;"
