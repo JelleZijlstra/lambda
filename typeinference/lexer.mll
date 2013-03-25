@@ -5,12 +5,16 @@
 rule token = parse
 | "("	{ LPAREN }
 | ")"	{ RPAREN }
+| ";"	{ SEMICOLON }
 | "\\"	{ BACKSLASH }
 | "."	{ DOT }
 | "+"	{ PLUS }
 | "-"	{ MINUS }
 | "*"	{ TIMES }
 | ","	{ COMMA }
+| "ref"	{ REF }
+| "!"	{ BANG }
+| ":="	{ ASSIGN }
 | "let"	{ LET}
 | "in"	{ IN }
 | "="	{ EQUALS }

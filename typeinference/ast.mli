@@ -19,6 +19,7 @@ type ltype =
 	| Typevar of string
 	| Product of ltype * ltype
 	| Sum of ltype * ltype
+	| Ref of ltype
 
 type expr =
 	Var of string
@@ -35,6 +36,11 @@ type expr =
 	| Projection of bool * expr
 	| Case of expr * expr * expr
 	| Injection of bool * expr
+	| Sequence of expr * expr
+	| Assignment of expr * expr
+	| Dereference of expr
+	| Allocation of expr
+	| Reference of expr ref
 	| Unit
 
 val string_of_type : ltype -> string

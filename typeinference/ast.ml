@@ -19,6 +19,7 @@ type ltype =
 	| Typevar of string
 	| Product of ltype * ltype
 	| Sum of ltype * ltype
+	| Ref of ltype
 
 type expr =
 	Var of string
@@ -35,12 +36,18 @@ type expr =
 	| Projection of bool * expr
 	| Case of expr * expr * expr
 	| Injection of bool * expr
+	| Sequence of expr * expr
+	| Assignment of expr * expr
+	| Dereference of expr
+	| Allocation of expr
+	| Reference of expr ref
 	| Unit
 
 let rec string_of_type t = match t with
 	| Int -> "int"
 	| Bool -> "bool"
 	| Uni -> "unit"
+	| Ref t -> "ref " ^ string_of_type t
 	| Function(Function(_, _) as f, t) -> "(" ^ string_of_type f ^ ") -> " ^ string_of_type t
 	| Function(a, b) -> string_of_type a ^ " -> " ^ string_of_type b
 	| Typevar t -> "'" ^ t
@@ -95,6 +102,11 @@ let rec string_of_expr e =
 	| Case(e1, e2, e3) -> "case " ^ string_of_expr e1 ^ " of " ^ string_of_expr e2 ^ " | " ^ string_of_expr e3
 	| Injection(false, e) -> "inl " ^ string_of_expr e
 	| Injection(true, e) -> "inr " ^ string_of_expr e
+	| Sequence(e1, e2) -> string_of_expr e1 ^ "; " ^ string_of_expr e2
+	| Assignment(e1, e2) -> string_of_expr e1 ^ " := " ^ string_of_expr e2
+	| Allocation e -> "ref " ^ string_of_expr e
+	| Dereference e -> "!" ^ string_of_expr e
+	| Reference _ -> "<loc>"
 
 let new_typevar =
 	let current = ref 0 in

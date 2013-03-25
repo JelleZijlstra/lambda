@@ -1,0 +1,5 @@
+let r = ref 3 in
+let f = \x. print (!r) in
+(f ();
+r := 4;
+f())

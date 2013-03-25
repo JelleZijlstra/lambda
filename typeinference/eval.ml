@@ -14,12 +14,16 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Application(e1, e2)
 	| Pair(e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Abstraction(arg, _, body) -> (arg <> var) && (is_free_variable var body)
-	| Integer _ | Boolean _ | Unit -> false
+	| Integer _ | Boolean _ | Reference _ | Unit -> false
+	| Assignment(e1, e2)
+	| Sequence(e1, e2)
 	| Binop(_, e1, e2)
 	| Boolbinop(_, e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Case(e1, e2, e3)
 	| If(e1, e2, e3) -> is_free_variable var e1 || is_free_variable var e2 || is_free_variable var e3
-	| Unop(_, e) -> is_free_variable var e
+	| Allocation e
+	| Dereference e
+	| Unop(_, e)
 	| Fix e -> is_free_variable var e
 	| Projection(_, e)
 	| Injection(_, e) -> is_free_variable var e
@@ -27,12 +31,15 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
 	| Application(e1, e2) -> Application(substitute e1 var replacement, substitute e2 var replacement)
-	| Integer _ | Boolean _ | Unit -> code
+	| Integer _ | Boolean _ | Reference _ | Unit -> code
 	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| Boolbinop(op, e1, e2) -> Boolbinop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| If(e1, e2, e3) -> If(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
 	| Unop(op, e) -> Unop(op, substitute e var replacement)
 	| Fix e -> Fix(substitute e var replacement)
+	| Allocation e -> Allocation(substitute e var replacement)
+	| Assignment(e1, e2) -> Assignment(substitute e1 var replacement, substitute e2 var replacement)
+	| Dereference e -> Dereference(substitute e var replacement)
 	| Abstraction(arg, t, body) ->
 		if arg = var then Abstraction(arg, t, body)
 		else if not (is_free_variable arg replacement)
@@ -43,11 +50,11 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Projection(b, e) -> Projection(b, substitute e var replacement)
 	| Injection(b, e) -> Injection(b, substitute e var replacement)
 	| Case(e1, e2, e3) -> Case(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
-
+	| Sequence(e1, e2) -> Sequence(substitute e1 var replacement, substitute e2 var replacement)
 
 let rec eval (e : expr) (s : semantics) : expr = match e with
 	| Var x -> failwith ("Unbound variable: " ^ x)
-	| Abstraction(_, _, _) -> e
+	| Abstraction(_, _, _) | Reference _ -> e
 	| Integer n -> Integer n
 	| Boolean b -> Boolean b
 	| Unit -> Unit
@@ -99,6 +106,14 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		| Injection(false, e') -> eval (Application(e2, e')) s
 		| Injection(true, e') -> eval (Application(e3, e')) s
 		| _ -> failwith "This expression is not a sum; it cannot be matched on")
+	| Assignment(e1, e2) -> (match eval e1 s with
+		| Reference r -> r := (eval e2 s)
+		| _ -> failwith "This expression is not a reference; it cannot be assigned to"); Unit
+	| Allocation e -> Reference(ref (eval e s))
+	| Dereference e -> (match eval e s with
+		| Reference r -> !r
+		| _ -> failwith "This expression is not a reference; it cannot be dereferenced")
+	| Sequence(e1, e2) -> let _ = eval e1 s in eval e2 s
 
 let eval_cbv e = eval e CBV
 let eval_cbn e = eval e CBN
