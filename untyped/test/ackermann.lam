@@ -206,6 +206,21 @@ let x = print 100 in
 #let merged = merge lst1 lst2 in
 #let x = printlist merged in
 
+let makelist' = \makelist. \n. ((iszero n)
+	(\x. nil)
+	(\x. cons n (makelist (pred n)))) id in
+let makelist = Z makelist' in
+
+let ten = mult two five in
+let hundred = mult ten ten in
+let fifty = mult five ten in
+
+let long_list = makelist fifty in
+
+let sorted_list = qsort long_list in
+
+let x = printlist sorted_list in
+
 let x = print 100 in
 
 print (length numlist)

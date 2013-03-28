@@ -62,3 +62,42 @@ let rec compile_rec e = match e with
 	| Sequence(e1, e2) -> "(ignore(" ^ compile_rec e1 ^ "); " ^ compile_rec e2 ^ ")"
 
 let compile_ml e = "let _ = Printf.printf \"%d\\n\" (" ^ compile_rec e ^ ");;"
+
+let make_new_var : unit -> string =
+	let n = ref 0 in
+	fun () ->
+		let current = !n in
+		n := current + 1;
+		"n" ^ string_of_int current
+
+let rec compile_rec e = match e with
+	| Var x -> translate_var x
+	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
+	| Abstraction(arg, _, body) -> "(" ^ translate_var arg ^ " => (" ^ compile_rec body ^ "))"
+	| Integer n -> string_of_int n
+	| Boolean true -> "true"
+	| Boolean false -> "false"
+	| Unit -> "()"
+	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ string_of_binop op ^ " " ^ compile_rec e2 ^ ")"
+	| Boolbinop(Equals, e1, e2) -> "(" ^ compile_rec e1 ^ " == " ^ compile_rec e2 ^ ")"
+	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ string_of_bool_binop op ^ " " ^ compile_rec e2 ^ ")"
+	| Unop(Print, e) -> "((func: x; echo x; x; end)" ^ compile_rec e ^ ")"
+	| If(e1, e2, e3) -> "(if (" ^ compile_rec e1 ^ "); " ^ compile_rec e2 ^ "; else " ^ compile_rec e3 ^ "; end)"
+	| Fix(Abstraction(arg, _, body)) ->
+		"((func: ; private " ^ translate_var arg ^ " = " ^ compile_rec body ^ "; "
+			^ translate_var arg ^ "; end) ())"
+	| Fix _ | Reference _ -> failwith "Impossible"
+	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
+	| Projection(false, e) -> "(" ^ compile_rec e ^ "->0)"
+	| Projection(true, e) -> "(" ^ compile_rec e ^ "->1)"
+	| Injection(b, e) -> "(" ^ (if b then "true" else "false") ^ ", " ^ compile_rec e ^ ")"
+	| Case(e1, e2, e3) ->
+		let x = make_new_var () in
+		"((" ^ x ^ " => (if " ^ x ^ "->0; " ^ compile_rec e3 ^ "; else "
+			^ compile_rec e2 ^ "; end)(" ^ x ^ "->1)) " ^ compile_rec e1 ^ ")"
+	| Allocation e -> "{value: " ^ compile_rec e ^ "}"
+	| Assignment(e1, e2) -> "(" ^ compile_rec e1 ^ "->'value' = " ^ compile_rec e2 ^ ")"
+	| Dereference e -> "(" ^ compile_rec e ^ "->'value')"
+	| Sequence(e1, e2) -> "((func: ; " ^ compile_rec e1 ^ "; " ^ compile_rec e2 ^ "; end)())"
+
+let compile_eh e = "echo ('Result: ' + " ^ compile_rec e ^ ");"
