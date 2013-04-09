@@ -55,7 +55,7 @@ let rec replace_in_type typevar new_type t =
 
 let quantify (ctxt : context) (t : ltype) : ltype =
 	let vars = VariableSet.diff (free_variables t) (free_variables_context ctxt) in
-	TForAll(VariableSet.elements vars, t)
+	if VariableSet.is_empty vars then t else TForAll(VariableSet.elements vars, t)
 
 let instantiate t = match t with
 	| TForAll(lst, t') -> List.fold_left (fun t tv -> replace_in_type tv (new_typevar()) t) t' lst
