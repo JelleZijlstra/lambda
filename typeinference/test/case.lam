@@ -1,0 +1,5 @@
+let x = inl 3 in
+let y = inr 3 in
+let f = \z. case z of (\x. print 2) | (\x. print 3) in
+(f x;
+f y)

@@ -1,0 +1,7 @@
+let map = \f. \p. (f (fst p), f (snd p)) in
+let p = (1, 2) in
+let id = \x. x in
+let isone = \x. x = 1 in
+let not = \b. if b then false else true in
+
+((map isone p, map not (map isone p)), (map id p, map id (map isone p)))

@@ -1,0 +1,2 @@
+let x = {foo = 4, bar = 3} in
+(x.foo, x.bar)
