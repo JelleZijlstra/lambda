@@ -254,9 +254,9 @@ let rec get_type (e : expr) (c : context) : type_cs =
 		let new_cs = ConstraintSet.add (HasLabel(t, l, tv)) cs in
 		Type(tv, new_cs)
 
-let print_cs cs = ConstraintSet.fold (fun e a -> match e with
-	| Equals(t1, t2) -> "\t" ^ string_of_type t1 ^ " = " ^ string_of_type t2 ^ "\n" ^ a
-	| HasLabel(t1, l, t2) -> "\t" ^ string_of_type t1 ^ " has label " ^ l ^ " of type " ^ string_of_type t2) cs ""
+let print_cs cs = ConstraintSet.fold (fun e a -> (match e with
+	| Equals(t1, t2) -> "\t" ^ string_of_type t1 ^ " = " ^ string_of_type t2
+	| HasLabel(t1, l, t2) -> "\t" ^ string_of_type t1 ^ " has label " ^ l ^ " of type " ^ string_of_type t2) ^ "\n" ^ a) cs ""
 
 let typecheck e =
 	try let Type(t, cs) = get_type e TypingContext.empty in
