@@ -12,21 +12,25 @@ type unop =
 	Print
 
 type ltype =
-	| Int
-	| Bool
-	| Uni
-	| Function of ltype * ltype
+	| TInt
+	| TBool
+	| TUnit
+	| TFunction of ltype * ltype
 	| Typevar of string
-	| Product of ltype * ltype
-	| Sum of ltype * ltype
-	| Ref of ltype
+	| TProduct of ltype * ltype
+	| TSum of ltype * ltype
+	| TRef of ltype
+	| TRecord of (string * ltype) list
+	| TForAll of string list * ltype
 
 type expr =
 	Var of string
 	| Abstraction of string * ltype * expr
 	| Application of expr * expr
-	| Integer of int
-	| Boolean of bool
+	| Let of string * ltype * expr * expr
+	| LetRec of string * ltype * expr * expr
+	| Int of int
+	| Bool of bool
 	| Binop of binop * expr * expr
 	| Boolbinop of boolbinop * expr * expr
 	| If of expr * expr * expr
@@ -41,6 +45,8 @@ type expr =
 	| Dereference of expr
 	| Allocation of expr
 	| Reference of expr ref
+	| Record of (string * expr) list
+	| Member of expr * string
 	| Unit
 
 val string_of_type : ltype -> string

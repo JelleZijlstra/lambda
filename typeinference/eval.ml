@@ -14,7 +14,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Application(e1, e2)
 	| Pair(e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Abstraction(arg, _, body) -> (arg <> var) && (is_free_variable var body)
-	| Integer _ | Boolean _ | Reference _ | Unit -> false
+	| Int _ | Bool _ | Reference _ | Unit -> false
 	| Assignment(e1, e2)
 	| Sequence(e1, e2)
 	| Binop(_, e1, e2)
@@ -24,14 +24,18 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Allocation e
 	| Dereference e
 	| Unop(_, e)
+	| Member(e, _)
 	| Fix e -> is_free_variable var e
 	| Projection(_, e)
 	| Injection(_, e) -> is_free_variable var e
+	| Record lst -> List.exists (fun (l, e) -> is_free_variable var e) lst
+	| Let(x, t, e1, e2) -> is_free_variable var e1 || (x <> var && is_free_variable var e2)
+	| LetRec(x, t, e1, e2) -> (x <> var) && (is_free_variable var e1 || is_free_variable var e2)
 
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
 	| Application(e1, e2) -> Application(substitute e1 var replacement, substitute e2 var replacement)
-	| Integer _ | Boolean _ | Reference _ | Unit -> code
+	| Int _ | Bool _ | Reference _ | Unit -> code
 	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| Boolbinop(op, e1, e2) -> Boolbinop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| If(e1, e2, e3) -> If(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
@@ -51,31 +55,37 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Injection(b, e) -> Injection(b, substitute e var replacement)
 	| Case(e1, e2, e3) -> Case(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
 	| Sequence(e1, e2) -> Sequence(substitute e1 var replacement, substitute e2 var replacement)
+	| Record lst -> Record(List.map (fun (l, e) -> l, substitute e var replacement) lst)
+	| Member(e, l) -> Member(substitute e var replacement, l)
+	| Let(x, t, e1, e2) when x = var -> Let(x, t, substitute e1 var replacement, e2)
+	| Let(x, t, e1, e2) -> Let(x, t, substitute e1 var replacement, substitute e2 var replacement)
+	| LetRec(x, t, e1, e2) when x = var -> code
+	| LetRec(x, t, e1, e2) -> LetRec(x, t, substitute e1 var replacement, substitute e2 var replacement)
 
 let rec eval (e : expr) (s : semantics) : expr = match e with
 	| Var x -> failwith ("Unbound variable: " ^ x)
 	| Abstraction(_, _, _) | Reference _ -> e
-	| Integer n -> Integer n
-	| Boolean b -> Boolean b
+	| Int n -> Int n
+	| Bool b -> Bool b
 	| Unit -> Unit
 	| Binop(op, e1, e2) ->
 		let e1' = eval e1 s in
 		let e2' = eval e2 s in
 		(match e1', e2' with
-		| Integer n1, Integer n2 -> Integer(f_of_binop op n1 n2)
-		| Integer _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e2')
+		| Int n1, Int n2 -> Int(f_of_binop op n1 n2)
+		| Int _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e2')
 		| _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e1'))
 	| Boolbinop(op, e1, e2) ->
 		let e1' = eval e1 s in
 		let e2' = eval e2 s in
 		(match e1', e2' with
-		| Integer n1, Integer n2 -> Boolean(f_of_bool_binop op n1 n2)
-		| Integer _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e2')
+		| Int n1, Int n2 -> Bool(f_of_bool_binop op n1 n2)
+		| Int _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e2')
 		| _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_expr e1'))
 	| Unop(op, e) ->
 		let e' = eval e s in
 		(match e' with
-		| Integer n -> Integer(f_of_unop op n)
+		| Int n -> Int(f_of_unop op n)
 		| _ -> failwith("Invalid operand to unary expression: " ^ string_of_expr e))
 	| Application(e1, e2) ->
 		let e1' = eval e1 s in
@@ -91,8 +101,8 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		eval (substitute body arg e) s
 	| Fix _ -> failwith "Invalid use of fix"
 	| If(e1, e2, e3) -> (match eval e1 s with
-		| Boolean true -> eval e2 s
-		| Boolean false -> eval e3 s
+		| Bool true -> eval e2 s
+		| Bool false -> eval e3 s
 		| _ -> failwith "If block must contain a bool")
 	| Pair(e1, e2) ->
 		let e1' = eval e1 s in
@@ -114,6 +124,19 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		| Reference r -> !r
 		| _ -> failwith "This expression is not a reference; it cannot be dereferenced")
 	| Sequence(e1, e2) -> let _ = eval e1 s in eval e2 s
+	| Record lst -> Record(List.map (fun (l, e) -> l, eval e s) lst)
+	| Member(e, l) -> (match eval e s with
+		| Record lst -> (try List.assoc l lst
+			with Not_found -> failwith("Unknown label: " ^ l))
+		| _ -> failwith "This expression is not a record; member access is not possible")
+	| Let(x, t, e1, e2) ->
+		let e1' = eval e1 s in
+		let substituted = substitute e2 x e1' in
+		eval substituted s
+	| LetRec(x, t, e1, e2) ->
+		let e1' = eval (Fix(Abstraction(x, t, e1))) s in
+		let substituted = substitute e2 x e1' in
+		eval substituted s
 
 let eval_cbv e = eval e CBV
 let eval_cbn e = eval e CBN

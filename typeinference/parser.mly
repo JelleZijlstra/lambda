@@ -5,8 +5,12 @@
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
+%token LBRACE RBRACE
 
-%type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr single_expr
+%type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
+%type<Ast.expr> single_expr
+%type<(string * Ast.expr) list> record_list
+%type<(string * Ast.ltype) list> record_type_list
 %type<string> IDENTIFIER
 %type<int> INTEGER
 %type<Ast.ltype> type
@@ -26,13 +30,13 @@ single_expr:
 	| BACKSLASH IDENTIFIER COLON type DOT single_expr
 								{ Abstraction($2, $4, $6) }
 	| LET IDENTIFIER EQUALS expression IN single_expr
-								{ Application(Abstraction($2, new_typevar(), $6), $4) }
+								{ Let($2, new_typevar(), $4, $6) }
 	| LET IDENTIFIER COLON type EQUALS expression IN single_expr
-								{ Application(Abstraction($2, $4, $8), $6) }
+								{ Let($2, $4, $6, $8) }
 	| LET REC IDENTIFIER EQUALS expression IN single_expr
-								{ Application(Abstraction($3, new_typevar(), $7), Fix(Abstraction($3, new_typevar(), $5))) }
+								{ LetRec($3, new_typevar(), $5, $7) }
 	| LET REC IDENTIFIER COLON type EQUALS expression IN single_expr
-								{ Application(Abstraction($3, $5, $9), Fix(Abstraction($3, $5, $7))) }
+								{ LetRec($3, $5, $7, $9) }
 	| FST single_expr			{ Projection(false, $2) }
 	| SND single_expr			{ Projection(true, $2) }
 	| IF expression THEN expression ELSE single_expr
@@ -70,29 +74,49 @@ times_expr:
 	| apply_expr				{ $1 }
 
 apply_expr:
-	apply_expr simple_expr		{ Application($1, $2) }
+	apply_expr member_expr		{ Application($1, $2) }
+	| member_expr				{ $1 }
+
+member_expr:
+	member_expr DOT IDENTIFIER	{ Member($1, $3) }
 	| simple_expr				{ $1 }
 
 simple_expr:
 	| LPAREN expression RPAREN	{ $2 }
 	| IDENTIFIER				{ Var($1) }
-	| INTEGER					{ Integer($1) }
-	| BOOLEAN					{ Boolean($1) }
+	| INTEGER					{ Int($1) }
+	| BOOLEAN					{ Bool($1) }
 	| LPAREN expression COMMA expression RPAREN
 								{ Pair($2, $4) }
 	| LPAREN RPAREN				{ Unit }
+	| LBRACE RBRACE				{ Record [] }
+	| LBRACE record_list RBRACE	{ Record $2 }
+
+record_list:
+	| IDENTIFIER EQUALS expression
+								{ [($1, $3)] }
+	| IDENTIFIER EQUALS expression COMMA record_list
+								{ ($1, $3)::$5 }
 
 type:
-	| product_type ARROW type	{ Function($1, $3) }
+	| product_type ARROW type	{ TFunction($1, $3) }
 	| product_type				{ $1 }
 
 product_type:
 	| simple_type TIMES product_type
-								{ Product($1, $3) }
+								{ TProduct($1, $3) }
 	| simple_type				{ $1 }
 
 simple_type:
 	| LPAREN type RPAREN		{ $2 }
-	| INT						{ Int }
-	| BOOL						{ Bool }
-	| UNIT						{ Uni }
+	| LBRACE RBRACE				{ TRecord [] }
+	| LBRACE record_type_list RBRACE
+								{ TRecord $2 }
+	| INT						{ TInt }
+	| BOOL						{ TBool }
+	| UNIT						{ TUnit }
+
+record_type_list:
+	| IDENTIFIER COLON type		{ [($1, $3)] }
+	| IDENTIFIER COLON type COMMA record_type_list
+								{ ($1, $3)::$5 }

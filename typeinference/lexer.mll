@@ -5,6 +5,8 @@
 rule token = parse
 | "("	{ LPAREN }
 | ")"	{ RPAREN }
+| "{"	{ LBRACE }
+| "}"	{ RBRACE }
 | ";"	{ SEMICOLON }
 | "\\"	{ BACKSLASH }
 | "."	{ DOT }

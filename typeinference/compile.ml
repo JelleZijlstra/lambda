@@ -1,8 +1,8 @@
 open Ast
 
 let z =
-	let inner_z = Abstraction("x", Int, Application(Var "f", Abstraction("y", Int, Application(Application(Var "x", Var "x"), Var "y")))) in
-	Abstraction("f", Int, Application(inner_z, inner_z))
+	let inner_z = Abstraction("x", TInt, Application(Var "f", Abstraction("y", TInt, Application(Application(Var "x", Var "x"), Var "y")))) in
+	Abstraction("f", TInt, Application(inner_z, inner_z))
 
 let translate_var v =
 	"v" ^ Str.global_replace (Str.regexp "'") "_u" v
@@ -11,7 +11,7 @@ let rec compile_rec e = match e with
 	| Var x -> translate_var x
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ "(" ^ compile_rec e2 ^ "))"
 	| Abstraction(arg, _, body) -> "(function(" ^ translate_var arg ^ ") {return (" ^ compile_rec body ^ ");})"
-	| Integer n -> string_of_int n
+	| Int n -> string_of_int n
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_binop op ^ compile_rec e2 ^ ")"
 	| Boolbinop(Equals, e1, e2) -> "(" ^ compile_rec e1 ^ " == " ^ compile_rec e2 ^ ")"
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
@@ -21,8 +21,8 @@ let rec compile_rec e = match e with
 		compile_rec(Application(z, Abstraction(arg, t, body)))
 	| Fix _ | Reference _ -> failwith "Impossible"
 	| If(e1, e2, e3) -> "((" ^ compile_rec e1 ^ ") ? (" ^ compile_rec e2 ^ ") : (" ^ compile_rec e3 ^ "))"
-	| Boolean true -> "true"
-	| Boolean false -> "false"
+	| Bool true -> "true"
+	| Bool false -> "false"
 	| Pair(e1, e2) -> "[" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ "]"
 	| Projection(false, e) -> "(" ^ compile_rec e ^ "[0])"
 	| Projection(true, e) -> "(" ^ compile_rec e ^ "[1])"
@@ -34,6 +34,12 @@ let rec compile_rec e = match e with
 	| Assignment(e1, e2) -> "((" ^ compile_rec e1 ^ ").value = (" ^ compile_rec e2 ^ "))"
 	| Dereference e -> "(" ^ compile_rec e ^ ").value"
 	| Sequence(e1, e2) -> "((function() { " ^ compile_rec e1 ^ "; return (" ^ compile_rec e2 ^ "); })())"
+	| Record lst ->
+		let foldf rest (l, e) = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
+		"{" ^ List.fold_left foldf "" lst ^ "}"
+	| Member(e, l) -> "(" ^ compile_rec e ^ ")." ^ l
+	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
+	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 
 let compile e = "console.log(\"Result: \" + " ^ compile_rec e ^ ");"
 
@@ -41,9 +47,9 @@ let rec compile_rec e = match e with
 	| Var x -> translate_var x
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(fun " ^ translate_var arg ^ " -> " ^ compile_rec body ^ ")"
-	| Integer n -> string_of_int n
-	| Boolean true -> "true"
-	| Boolean false -> "false"
+	| Int n -> string_of_int n
+	| Bool true -> "true"
+	| Bool false -> "false"
 	| Unit -> "()"
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_binop op ^ compile_rec e2 ^ ")"
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
@@ -60,6 +66,10 @@ let rec compile_rec e = match e with
 	| Assignment(e1, e2) -> "(" ^ compile_rec e1 ^ " := " ^ compile_rec e2 ^ ")"
 	| Dereference e -> "(!" ^ compile_rec e ^ ")"
 	| Sequence(e1, e2) -> "(ignore(" ^ compile_rec e1 ^ "); " ^ compile_rec e2 ^ ")"
+	| Record lst -> failwith "Not implemented"
+	| Member(e, l) -> failwith "Not implemented"
+	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
+	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 
 let compile_ml e = "let _ = Printf.printf \"%d\\n\" (" ^ compile_rec e ^ ");;"
 
@@ -74,9 +84,9 @@ let rec compile_rec e = match e with
 	| Var x -> translate_var x
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(" ^ translate_var arg ^ " => (" ^ compile_rec body ^ "))"
-	| Integer n -> string_of_int n
-	| Boolean true -> "true"
-	| Boolean false -> "false"
+	| Int n -> string_of_int n
+	| Bool true -> "true"
+	| Bool false -> "false"
 	| Unit -> "()"
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ string_of_binop op ^ " " ^ compile_rec e2 ^ ")"
 	| Boolbinop(Equals, e1, e2) -> "(" ^ compile_rec e1 ^ " == " ^ compile_rec e2 ^ ")"
@@ -99,5 +109,11 @@ let rec compile_rec e = match e with
 	| Assignment(e1, e2) -> "(" ^ compile_rec e1 ^ "->'value' = " ^ compile_rec e2 ^ ")"
 	| Dereference e -> "(" ^ compile_rec e ^ "->'value')"
 	| Sequence(e1, e2) -> "((func: ; " ^ compile_rec e1 ^ "; " ^ compile_rec e2 ^ "; end)())"
+	| Record lst ->
+		let foldf rest (l, e) = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
+		"{" ^ List.fold_left foldf "" lst ^ "}"
+	| Member(e, l) -> "((" ^ compile_rec e ^ ")->'" ^ l ^ "')"
+	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
+	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 
 let compile_eh e = "echo ('Result: ' + " ^ compile_rec e ^ ");"
