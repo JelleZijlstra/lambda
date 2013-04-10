@@ -1,0 +1,17 @@
+type t = C1 int | C2 bool bool | C3 (int * bool) in
+let f = \t. match t with {
+	| C1 3 -> print 3
+	| C1 _ -> print 1
+	| C2 true false -> print 2
+	| C2 _ b -> print (if b then 4 else 5)
+	| C3 (3, true) -> print 6
+	| C3 (_, _) -> print 7
+} in
+(f (C1 3); # 3
+f (C1 2); # 1
+f (C2 true false); # 2
+f (C2 false true); # 4
+f (C2 false false); # 5
+f (C3 (3, true)); # 6
+f (C3 (4, true)); # 7
+f)

@@ -23,6 +23,7 @@ type ltype =
 	| TRecord of (string * ltype) list
 	| TForAll of string list * ltype
 	| TADT of adt
+	| TParameterized of ltype * ltype
 and adt = adt_cons list
 and adt_cons = string * ltype list
 
@@ -32,7 +33,7 @@ type expr =
 	| Application of expr * expr
 	| Let of string * ltype * expr * expr
 	| LetRec of string * ltype * expr * expr
-	| LetType of string * adt * expr
+	| LetType of string * string list * adt * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr
@@ -59,6 +60,9 @@ and pattern =
 	PAnything
 	| PVariable of string
 	| PConstructor of string * pattern list
+	| PInt of int
+	| PBool of bool
+	| PPair of pattern * pattern
 
 type value =
 	| VInt of int
@@ -94,6 +98,7 @@ let rec string_of_type t = match t with
 		"{" ^ List.fold_left foldf "" lst ^ "}"
 	| TForAll(lst, t) -> "forall " ^ join ", " lst ^ ". " ^ string_of_type t
 	| TADT(lst) -> join " | " (List.map (fun (name, args) -> name ^ " " ^ join " " (List.map string_of_type args)) lst)
+	| TParameterized(t1, t2) -> string_of_type t1 ^ " " ^ string_of_type t2
 
 let f_of_binop op = match op with
 	| Plus -> (+)
@@ -158,7 +163,9 @@ let rec string_of_expr e =
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
 	| ADTInstance(n, lst) -> n ^ " " ^ join " " (List.map string_of_expr lst)
-	| LetType(s, adt, e) -> "type " ^ s ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
+	| LetType(s, params, adt, e) ->
+		let params_str = List.fold_left (^) "" (List.map ((^) " ") params) in
+		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
 	| Match(e, lst) ->
 		let patterns = List.map (fun (p, e) -> string_of_pattern p ^ " -> " ^ string_of_expr e) lst in
 		"match " ^ string_of_expr e ^ " with " ^ join " | " patterns
@@ -166,6 +173,10 @@ and string_of_pattern p = match p with
 	| PAnything -> "_"
 	| PVariable v -> v
 	| PConstructor(n, lst) -> n ^ " " ^ join " " (List.map string_of_pattern lst)
+	| PInt n -> string_of_int n
+	| PBool true -> "true"
+	| PBool false -> "false"
+	| PPair(p1, p2) -> "(" ^ string_of_pattern p1 ^ ", " ^ string_of_pattern p2 ^ ")"
 
 let rec string_of_value e =
 	match e with

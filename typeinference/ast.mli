@@ -23,6 +23,7 @@ type ltype =
 	| TRecord of (string * ltype) list
 	| TForAll of string list * ltype
 	| TADT of adt
+	| TParameterized of ltype * ltype
 and adt = adt_cons list
 and adt_cons = string * ltype list
 
@@ -32,7 +33,7 @@ type expr =
 	| Application of expr * expr
 	| Let of string * ltype * expr * expr
 	| LetRec of string * ltype * expr * expr
-	| LetType of string * adt * expr
+	| LetType of string * string list * adt * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr
@@ -59,6 +60,9 @@ and pattern =
 	PAnything
 	| PVariable of string
 	| PConstructor of string * pattern list
+	| PInt of int
+	| PBool of bool
+	| PPair of pattern * pattern
 
 type value =
 	| VInt of int

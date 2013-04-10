@@ -41,8 +41,8 @@ single_expr:
 								{ LetRec($3, new_typevar(), $5, $7) }
 	| LET REC IDENTIFIER COLON type EQUALS expression IN single_expr
 								{ LetRec($3, $5, $7, $9) }
-	| TYPE IDENTIFIER EQUALS adt_member adt_list IN single_expr
-								{ LetType($2, $4::$5, $7) }
+	| TYPE IDENTIFIER parameter_list EQUALS adt_member adt_list IN single_expr
+								{ LetType($2, $3, $5::$6, $8) }
 	| FST single_expr			{ Projection(false, $2) }
 	| SND single_expr			{ Projection(true, $2) }
 	| IF expression THEN expression ELSE single_expr
@@ -114,8 +114,13 @@ type:
 	| product_type				{ $1 }
 
 product_type:
-	| simple_type TIMES product_type
+	| instantiated_type TIMES product_type
 								{ TProduct($1, $3) }
+	| instantiated_type			{ $1 }
+
+instantiated_type:
+	| instantiated_type simple_type
+								{ TParameterized($1, $2) }
 	| simple_type				{ $1 }
 
 simple_type:
@@ -134,11 +139,11 @@ record_type_list:
 								{ ($1, $3)::$5 }
 
 adt_member:
-	| CONSTRUCTOR type_list		{ ($1, $2) }
+	| CONSTRUCTOR type_list		{ ($1, List.rev $2) }
 
 type_list:
 	| 							{ [] }
-	| type type_list			{ $1::$2 }
+	| simple_type type_list		{ $1::$2 }
 
 adt_list:
 	| 							{ [] }
@@ -152,6 +157,10 @@ pattern:
 simple_pattern:
 	| UNDERSCORE				{ PAnything }
 	| IDENTIFIER				{ PVariable $1 }
+	| INTEGER					{ PInt $1 }
+	| BOOLEAN					{ PBool $1 }
+	| LPAREN pattern COMMA pattern RPAREN
+								{ PPair($2, $4) }
 	| LPAREN pattern RPAREN		{ $2 }
 
 internal_pattern_lst:
@@ -163,3 +172,7 @@ pattern_list:
 	|							{ [] }
 	| BAR pattern ARROW single_expr pattern_list
 								{ ($2, $4)::$5 }
+
+parameter_list:
+	|							{ [] }
+	| IDENTIFIER parameter_list	{ $1::$2 }

@@ -1,0 +1,11 @@
+type option a = None | Some a in
+let f = \o. match o with {
+	None -> 0
+	| Some n -> n
+} in
+let f' = \o. match o with {
+	None -> false
+	| Some b -> b
+} in
+
+((f None, f (Some 42)), (f' None, f' (Some true)))

@@ -1,0 +1,10 @@
+type list a = Nil | Cons a (list a) in
+let rec map = \f. \lst. match lst with {
+	Nil -> Nil
+	| Cons hd tl -> Cons (f hd) (map f tl)
+} in
+let l = Cons 3 (Cons 1 Nil) in
+let l' = map (\x. x = 1) l in
+let l'' = map (\x. x + 1) l in
+(l', l'')
+

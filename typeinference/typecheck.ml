@@ -41,6 +41,7 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| TADT(lst) ->
 		let mapf (_, t) = List.fold_left VariableSet.union VariableSet.empty (List.map free_variables t) in
 		List.fold_left VariableSet.union VariableSet.empty (List.map mapf lst)
+	| TParameterized(t1, t2) -> VariableSet.union (free_variables t1) (free_variables t2)
 
 let free_variables_context (c : context) =
 	TypingContext.fold (fun _ t a -> VariableSet.union (free_variables t) a) c VariableSet.empty
@@ -58,6 +59,7 @@ let rec replace_in_type typevar new_type t =
 	| TADT(lst) ->
 		let mapf (l, t) = l, List.map (replace_in_type typevar new_type) t in
 		TADT(List.map mapf lst)
+	| TParameterized(t1, t2) -> TParameterized(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 
 let quantify (ctxt : context) (t : ltype) : ltype =
 	let vars = VariableSet.diff (free_variables t) (free_variables_context ctxt) in
@@ -86,6 +88,7 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| TInt | TBool | TUnit -> false
 	| TProduct(t1, t2)
 	| TSum(t1, t2)
+	| TParameterized(t1, t2)
 	| TFunction(t1, t2) -> is_free_variable t t1 || is_free_variable t t2
 	| TRef t' -> is_free_variable t t'
 	| TRecord lst -> List.exists (fun (l, t') -> is_free_variable t t') lst
@@ -104,6 +107,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 			TypingContext.add t t' rest
 		| Equals(TProduct(t0, t1), TProduct(t0', t1'))
 		| Equals(TSum(t0, t1), TSum(t0', t1'))
+		| Equals(TParameterized(t0, t1), TParameterized(t0', t1'))
 		| Equals(TFunction(t0, t1), TFunction(t0', t1')) ->
 			let new_cs = ConstraintSet.add (Equals(t0, t0')) new_set in
 			let new_cs = ConstraintSet.add (Equals(t1, t1')) new_cs in
@@ -143,6 +147,7 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 		let new_set = List.fold_left (fun a e -> VariableSet.add e a) b lst in
 		TForAll(lst, apply_substitution s t' new_set)
 	| TADT lst -> TADT(List.map (fun (l, t) -> (l, List.map (fun t -> apply_substitution s t b) t)) lst)
+	| TParameterized(t1, t2) -> TParameterized(apply_substitution s t1 b, apply_substitution s t2 b)
 
 let rec get_type (e : expr) (c : context) : type_cs =
 	match e with
@@ -263,14 +268,15 @@ let rec get_type (e : expr) (c : context) : type_cs =
 		Type(tv, new_cs)
 	| Constructor n -> (try Type(instantiate (TypingContext.find n c), em)
 		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
-	| LetType(name, lst, e) ->
-		let tv = Typevar name in
+	| LetType(name, params, lst, e) ->
+		let result_t = List.fold_left (fun r p -> TParameterized(r, Typevar p)) (Typevar name) params in
 		let foldf rest (name, lst) =
-			let t = List.fold_left (fun rest t -> TFunction(t, rest)) tv lst in
+			let t = List.fold_left (fun rest t -> TFunction(t, rest)) result_t lst in
+			let t = if params = [] then t else TForAll(params, t) in
 			TypingContext.add name t rest in
 		let new_tc = List.fold_left foldf c lst in
 		let Type(t1, cs1) = get_type e new_tc in
-		Type(t1, ConstraintSet.add (Equals(tv, TADT lst)) cs1)
+		Type(t1, cs1)
 	| ADTInstance(_, _) -> raise(TypeError("Should not appear here"))
 	| Match(e, lst) ->
 		let Type(t1, cs1) = get_type e c in
@@ -278,11 +284,17 @@ let rec get_type (e : expr) (c : context) : type_cs =
 		let foldf cs (p, e) =
 			let rec type_pattern p t cs = match p with
 			| PAnything -> ([], cs)
-			| PVariable x ->
-				let tv = Ast.new_typevar() in
-				([(x, tv)], cs)
+			| PVariable x -> ([(x, t)], cs)
+			| PInt _ -> ([], ConstraintSet.add (Equals(t, TInt)) cs)
+			| PBool _ -> ([], ConstraintSet.add (Equals(t, TBool)) cs)
+			| PPair(p1, p2) ->
+				let t1 = Ast.new_typevar() in
+				let t2 = Ast.new_typevar() in
+				let vars1, cs1 = type_pattern p1 t1 cs in
+				let vars2, cs2 = type_pattern p2 t2 cs1 in
+				(vars1 @ vars2, ConstraintSet.add (Equals(t, TProduct(t1, t2))) cs2)
 			| PConstructor(x, lst) ->
-				let xt = (try TypingContext.find x c
+				let xt = (try instantiate (TypingContext.find x c)
 					with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
 				let foldf (vars, cs, t) p =
 					let t' = Ast.new_typevar() in
@@ -305,12 +317,12 @@ let print_cs cs = ConstraintSet.fold (fun e a -> (match e with
 let typecheck e =
 	try let Type(t, cs) = get_type e TypingContext.empty in
 		(try
-			if verbose then (Printf.printf "%s\n" (print_cs cs);
-				Printf.printf "%s\n" (string_of_type t));
+			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
+				Printf.printf "Constraints:\n%s\n" (print_cs cs));
 			let subst = unify cs in
 			if verbose then
 				let res_t = apply_substitution subst t VariableSet.empty in
-				Printf.printf "%s\n" (string_of_type res_t)
+				Printf.printf "Final type: %s\n" (string_of_type res_t)
 			else ignore subst;
 			None
 		with ImpossibleConstraint e -> Some e)

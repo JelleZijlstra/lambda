@@ -20,7 +20,8 @@ let get_unique_var_name : unit -> string =
 let rec exists_in_pattern var p = match p with
 	| PVariable x when x = var -> true
 	| PConstructor(_, lst) -> List.exists (exists_in_pattern var) lst
-	| PVariable _ | PAnything -> false
+	| PPair(p1, p2) -> exists_in_pattern var p1 || exists_in_pattern var p2
+	| PVariable _ | PAnything | PBool _ | PInt _ -> false
 
 let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Var x | Constructor x -> var = x
@@ -40,7 +41,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Member(e, _)
 	| Fix e -> is_free_variable var e
 	| Projection(_, e)
-	| LetType(_, _, e)
+	| LetType(_, _, _, e)
 	| Injection(_, e) -> is_free_variable var e
 	| Record lst -> List.exists (fun (l, e) -> is_free_variable var e) lst
 	| Let(x, t, e1, e2) -> is_free_variable var e1 || (x <> var && is_free_variable var e2)
@@ -79,7 +80,7 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Let(x, t, e1, e2) -> Let(x, t, substitute e1 var replacement, substitute e2 var replacement)
 	| LetRec(x, t, e1, e2) when x = var -> code
 	| LetRec(x, t, e1, e2) -> LetRec(x, t, substitute e1 var replacement, substitute e2 var replacement)
-	| LetType(x, lst, e) -> if List.exists (fun (n, _) -> n = var) lst then e else substitute e var replacement
+	| LetType(x, _, lst, e) -> if List.exists (fun (n, _) -> n = var) lst then e else substitute e var replacement
 	| ADTInstance(n, lst) -> ADTInstance(n, List.map (fun e -> substitute e var replacement) lst)
 	| Match(e, lst) ->
 		let mapf (p, e) = if exists_in_pattern var p then (p, e) else (p, substitute e var replacement) in
@@ -161,21 +162,33 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		let substituted = substitute e2 x e1' in
 		eval substituted s
 	| ADTInstance(n, lst) -> ADTInstance(n, lst)
-	| LetType(_, lst, e) ->
+	| LetType(_, _, lst, e) ->
 		let rec mk_lst frm t =
 			if frm = t then [] else ("v" ^ string_of_int frm)::(mk_lst (frm + 1) t) in
 		let foldf rest (n, t) =
 			let lst = mk_lst 0 (List.length t) in
 			let base = ADTInstance(n, List.map (fun v -> Var v) lst) in
-			let f = List.fold_left (fun rest v -> Abstraction(v, TUnit, rest)) base lst in
+			let f = List.fold_right (fun v rest -> Abstraction(v, TUnit, rest)) lst base in
 			Let(n, TUnit, f, rest) in
-		eval (List.fold_left foldf e lst) s
+		let new_e = List.fold_left foldf e lst in
+		eval new_e s
 	| Constructor n -> eval (Var n) s
 	| Match(e, lst) ->
 		let match_expr = eval e s in
 		let rec eval_pattern p e = match p with
 			| PAnything -> Some []
 			| PVariable v -> Some[(v, e)]
+			| PInt n -> (match e with
+				| Int n' when n = n' -> Some []
+				| _ -> None)
+			| PBool b -> (match e with
+				| Bool b' when b = b' -> Some []
+				| _ -> None)
+			| PPair(p1, p2) -> (match e with
+				| Pair(e1, e2) -> (match eval_pattern p1 e1, eval_pattern p2 e2 with
+					| Some lst1, Some lst2 -> Some(lst1 @ lst2)
+					| _, _ -> None)
+				| _ -> failwith "Pair must be matched with pair")
 			| PConstructor(n, lst) -> (match e with
 				| ADTInstance(n', lst') when n = n' ->
 					List.fold_left2 (fun r p e ->
