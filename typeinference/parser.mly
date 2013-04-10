@@ -5,7 +5,7 @@
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
-%token LBRACE RBRACE TYPE CONSTRUCTOR
+%token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<Ast.expr> single_expr
@@ -13,6 +13,8 @@
 %type<Ast.adt_cons> adt_member
 %type<Ast.adt> adt_list
 %type<(string * Ast.ltype) list> record_type_list
+%type<Ast.pattern> pattern
+%type<(Ast.pattern * Ast.expr) list> pattern_list
 %type<string> IDENTIFIER CONSTRUCTOR
 %type<int> INTEGER
 %type<Ast.ltype> type
@@ -53,6 +55,10 @@ single_expr:
 	| FIX single_expr			{ Fix($2) }
 	| BANG single_expr			{ Dereference($2) }
 	| REF single_expr			{ Allocation($2) }
+	| MATCH expression WITH LBRACE pattern ARROW single_expr pattern_list RBRACE
+								{ Match($2, ($5, $7)::$8) }
+	| MATCH expression WITH LBRACE BAR pattern ARROW single_expr pattern_list RBRACE
+								{ Match($2, ($6, $8)::$9) }
 	| assign_expr				{ $1 }
 
 assign_expr:
@@ -137,3 +143,23 @@ type_list:
 adt_list:
 	| 							{ [] }
 	| BAR adt_member adt_list	{ $2::$3 }
+
+pattern:
+	| simple_pattern			{ $1 }
+	| CONSTRUCTOR internal_pattern_lst
+								{ PConstructor($1, $2) }
+
+simple_pattern:
+	| UNDERSCORE				{ PAnything }
+	| IDENTIFIER				{ PVariable $1 }
+	| LPAREN pattern RPAREN		{ $2 }
+
+internal_pattern_lst:
+	| 							{ [] }
+	| simple_pattern internal_pattern_lst
+								{ $1::$2 }
+
+pattern_list:
+	|							{ [] }
+	| BAR pattern ARROW single_expr pattern_list
+								{ ($2, $4)::$5 }

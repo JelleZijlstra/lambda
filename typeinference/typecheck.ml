@@ -272,6 +272,31 @@ let rec get_type (e : expr) (c : context) : type_cs =
 		let Type(t1, cs1) = get_type e new_tc in
 		Type(t1, ConstraintSet.add (Equals(tv, TADT lst)) cs1)
 	| ADTInstance(_, _) -> raise(TypeError("Should not appear here"))
+	| Match(e, lst) ->
+		let Type(t1, cs1) = get_type e c in
+		let res_tv = Ast.new_typevar() in
+		let foldf cs (p, e) =
+			let rec type_pattern p t cs = match p with
+			| PAnything -> ([], cs)
+			| PVariable x ->
+				let tv = Ast.new_typevar() in
+				([(x, tv)], cs)
+			| PConstructor(x, lst) ->
+				let xt = (try TypingContext.find x c
+					with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
+				let foldf (vars, cs, t) p =
+					let t' = Ast.new_typevar() in
+					let (vars', cs') = type_pattern p t' cs in
+					(vars' @ vars, cs', TFunction(t', t)) in
+				let vars, cs, other_t = List.fold_left foldf ([], cs, t) lst in
+				let cs = ConstraintSet.add (Equals(xt, other_t)) cs in
+				(vars, cs) in
+			let vars, cs = type_pattern p t1 cs in
+			let new_tc = List.fold_left (fun rest (x, t) -> TypingContext.add x t rest) c vars in
+			let Type(t', cs') = get_type e new_tc in
+			ConstraintSet.add (Equals(res_tv, t')) (ConstraintSet.union cs cs') in
+		let cs = List.fold_left foldf cs1 lst in
+		Type(res_tv, cs)
 
 let print_cs cs = ConstraintSet.fold (fun e a -> (match e with
 	| Equals(t1, t2) -> "\t" ^ string_of_type t1 ^ " = " ^ string_of_type t2

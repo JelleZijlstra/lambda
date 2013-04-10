@@ -17,12 +17,17 @@ let get_unique_var_name : unit -> string =
 		current := index + 1;
 		"'" ^ (string_of_int index)
 
+let rec exists_in_pattern var p = match p with
+	| PVariable x when x = var -> true
+	| PConstructor(_, lst) -> List.exists (exists_in_pattern var) lst
+	| PVariable _ | PAnything -> false
+
 let rec is_free_variable (var : string) (code : expr) : bool = match code with
-	| Var x -> var = x
+	| Var x | Constructor x -> var = x
 	| Application(e1, e2)
 	| Pair(e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Abstraction(arg, _, body) -> (arg <> var) && (is_free_variable var body)
-	| Int _ | Bool _ | Reference _ | Unit -> false
+	| Int _ | Bool _ | Reference _ | Unit | ADTInstance(_, _) -> false
 	| Assignment(e1, e2)
 	| Sequence(e1, e2)
 	| Binop(_, e1, e2)
@@ -35,10 +40,14 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Member(e, _)
 	| Fix e -> is_free_variable var e
 	| Projection(_, e)
+	| LetType(_, _, e)
 	| Injection(_, e) -> is_free_variable var e
 	| Record lst -> List.exists (fun (l, e) -> is_free_variable var e) lst
 	| Let(x, t, e1, e2) -> is_free_variable var e1 || (x <> var && is_free_variable var e2)
 	| LetRec(x, t, e1, e2) -> (x <> var) && (is_free_variable var e1 || is_free_variable var e2)
+	| Match(e, lst) ->
+		let existsf (p, e) = not (exists_in_pattern var p) && is_free_variable var e in
+		is_free_variable var e || List.exists existsf lst
 
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
@@ -72,6 +81,9 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| LetRec(x, t, e1, e2) -> LetRec(x, t, substitute e1 var replacement, substitute e2 var replacement)
 	| LetType(x, lst, e) -> if List.exists (fun (n, _) -> n = var) lst then e else substitute e var replacement
 	| ADTInstance(n, lst) -> ADTInstance(n, List.map (fun e -> substitute e var replacement) lst)
+	| Match(e, lst) ->
+		let mapf (p, e) = if exists_in_pattern var p then (p, e) else (p, substitute e var replacement) in
+		Match(substitute e var replacement, List.map mapf lst)
 
 let rec eval (e : expr) (s : semantics) : expr = match e with
 	| Var x -> failwith ("Unbound variable: " ^ x)
@@ -159,6 +171,27 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 			Let(n, TUnit, f, rest) in
 		eval (List.fold_left foldf e lst) s
 	| Constructor n -> eval (Var n) s
+	| Match(e, lst) ->
+		let match_expr = eval e s in
+		let rec eval_pattern p e = match p with
+			| PAnything -> Some []
+			| PVariable v -> Some[(v, e)]
+			| PConstructor(n, lst) -> (match e with
+				| ADTInstance(n', lst') when n = n' ->
+					List.fold_left2 (fun r p e ->
+						match r, eval_pattern p e with
+						| None, _ | _, None -> None
+						| Some lst, Some lst' -> Some(lst @ lst')) (Some []) lst lst'
+				| _ -> None) in
+		let rec eval_match lst = match lst with
+			| [] -> failwith "Inexhaustive pattern matching"
+			| (p, case_body)::tl -> (match eval_pattern p match_expr with
+				| None -> eval_match tl
+				| Some lst ->
+					let foldf e (x, v) = substitute e x v in
+					let e' = List.fold_left foldf case_body lst in
+					eval e' s) in
+		eval_match lst
 
 let eval_cbv e = eval e CBV
 let eval_cbn e = eval e CBN

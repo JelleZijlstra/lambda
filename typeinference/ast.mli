@@ -54,6 +54,11 @@ type expr =
 	| Unit
 	| Constructor of string
 	| ADTInstance of string * expr list
+	| Match of expr * (pattern * expr) list
+and pattern =
+	PAnything
+	| PVariable of string
+	| PConstructor of string * pattern list
 
 type value =
 	| VInt of int

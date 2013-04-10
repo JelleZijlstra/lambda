@@ -50,6 +50,11 @@ rule token = parse
 | "inr"	{ INR }
 | "type"
 		{ TYPE }
+| "match"
+		{ MATCH }
+| "with"
+		{ WITH }
+| "_"	{ UNDERSCORE }
 | ">"	{ GREATER }
 | "<"	{ LESS }
 | ['a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n

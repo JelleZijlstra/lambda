@@ -54,6 +54,11 @@ type expr =
 	| Unit
 	| Constructor of string
 	| ADTInstance of string * expr list
+	| Match of expr * (pattern * expr) list
+and pattern =
+	PAnything
+	| PVariable of string
+	| PConstructor of string * pattern list
 
 type value =
 	| VInt of int
@@ -154,6 +159,13 @@ let rec string_of_expr e =
 	| Constructor n -> n
 	| ADTInstance(n, lst) -> n ^ " " ^ join " " (List.map string_of_expr lst)
 	| LetType(s, adt, e) -> "type " ^ s ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
+	| Match(e, lst) ->
+		let patterns = List.map (fun (p, e) -> string_of_pattern p ^ " -> " ^ string_of_expr e) lst in
+		"match " ^ string_of_expr e ^ " with " ^ join " | " patterns
+and string_of_pattern p = match p with
+	| PAnything -> "_"
+	| PVariable v -> v
+	| PConstructor(n, lst) -> n ^ " " ^ join " " (List.map string_of_pattern lst)
 
 let rec string_of_value e =
 	match e with
