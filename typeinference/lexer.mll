@@ -48,10 +48,14 @@ rule token = parse
 | "|"	{ BAR }
 | "inl"	{ INL }
 | "inr"	{ INR }
+| "type"
+		{ TYPE }
 | ">"	{ GREATER }
 | "<"	{ LESS }
-| ['A'-'Z' 'a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
+| ['a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
 		{ IDENTIFIER(n) } (* variable names *)
+| ['A'-'Z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
+		{ CONSTRUCTOR(n) }
 | [' ' '\t' '\n']
 		{ token lexbuf } (* ignore whitespace *)
 | "#" [^'\n']+

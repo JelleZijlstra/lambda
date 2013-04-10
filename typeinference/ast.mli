@@ -22,6 +22,9 @@ type ltype =
 	| TRef of ltype
 	| TRecord of (string * ltype) list
 	| TForAll of string list * ltype
+	| TADT of adt
+and adt = adt_cons list
+and adt_cons = string * ltype list
 
 type expr =
 	Var of string
@@ -29,6 +32,7 @@ type expr =
 	| Application of expr * expr
 	| Let of string * ltype * expr * expr
 	| LetRec of string * ltype * expr * expr
+	| LetType of string * adt * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr
@@ -48,6 +52,19 @@ type expr =
 	| Record of (string * expr) list
 	| Member of expr * string
 	| Unit
+	| Constructor of string
+	| ADTInstance of string * expr list
+
+type value =
+	| VInt of int
+	| VBool of bool
+	| VAbstraction of string * ltype * expr
+	| VReference of value ref
+	| VRecord of (string * value) list
+	| VUnit
+	| VConstructor of string * value
+	| VPair of value * value
+	| VInjection of bool * value
 
 val string_of_type : ltype -> string
 
@@ -64,5 +81,7 @@ val f_of_unop : unop -> int -> int
 val string_of_unop : unop -> string
 
 val string_of_expr : expr -> string
+
+val string_of_value : value -> string
 
 val new_typevar : unit -> ltype

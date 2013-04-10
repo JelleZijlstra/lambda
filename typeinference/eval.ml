@@ -2,6 +2,14 @@ open Ast
 
 type semantics = CBV | CBN
 
+(* TODO: runtime context (e.g., variable mapping)
+module Context : sig
+	type t
+end = struct
+	type t = 
+end
+ *)
+
 let get_unique_var_name : unit -> string =
 	let current = ref 0 in
 	fun () ->
@@ -34,6 +42,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 
 let rec substitute (code : expr) (var : string) (replacement : expr) : expr = match code with
 	| Var(x) -> if x = var then replacement else Var x
+	| Constructor n -> if n = var then replacement else Constructor n
 	| Application(e1, e2) -> Application(substitute e1 var replacement, substitute e2 var replacement)
 	| Int _ | Bool _ | Reference _ | Unit -> code
 	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e2 var replacement)
@@ -61,6 +70,8 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Let(x, t, e1, e2) -> Let(x, t, substitute e1 var replacement, substitute e2 var replacement)
 	| LetRec(x, t, e1, e2) when x = var -> code
 	| LetRec(x, t, e1, e2) -> LetRec(x, t, substitute e1 var replacement, substitute e2 var replacement)
+	| LetType(x, lst, e) -> if List.exists (fun (n, _) -> n = var) lst then e else substitute e var replacement
+	| ADTInstance(n, lst) -> ADTInstance(n, List.map (fun e -> substitute e var replacement) lst)
 
 let rec eval (e : expr) (s : semantics) : expr = match e with
 	| Var x -> failwith ("Unbound variable: " ^ x)
@@ -137,6 +148,17 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		let e1' = eval (Fix(Abstraction(x, t, e1))) s in
 		let substituted = substitute e2 x e1' in
 		eval substituted s
+	| ADTInstance(n, lst) -> ADTInstance(n, lst)
+	| LetType(_, lst, e) ->
+		let rec mk_lst frm t =
+			if frm = t then [] else ("v" ^ string_of_int frm)::(mk_lst (frm + 1) t) in
+		let foldf rest (n, t) =
+			let lst = mk_lst 0 (List.length t) in
+			let base = ADTInstance(n, List.map (fun v -> Var v) lst) in
+			let f = List.fold_left (fun rest v -> Abstraction(v, TUnit, rest)) base lst in
+			Let(n, TUnit, f, rest) in
+		eval (List.fold_left foldf e lst) s
+	| Constructor n -> eval (Var n) s
 
 let eval_cbv e = eval e CBV
 let eval_cbn e = eval e CBN

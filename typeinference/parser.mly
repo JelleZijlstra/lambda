@@ -5,13 +5,15 @@
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
-%token LBRACE RBRACE
+%token LBRACE RBRACE TYPE CONSTRUCTOR
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<Ast.expr> single_expr
 %type<(string * Ast.expr) list> record_list
+%type<Ast.adt_cons> adt_member
+%type<Ast.adt> adt_list
 %type<(string * Ast.ltype) list> record_type_list
-%type<string> IDENTIFIER
+%type<string> IDENTIFIER CONSTRUCTOR
 %type<int> INTEGER
 %type<Ast.ltype> type
 %type<bool> BOOLEAN
@@ -37,6 +39,8 @@ single_expr:
 								{ LetRec($3, new_typevar(), $5, $7) }
 	| LET REC IDENTIFIER COLON type EQUALS expression IN single_expr
 								{ LetRec($3, $5, $7, $9) }
+	| TYPE IDENTIFIER EQUALS adt_member adt_list IN single_expr
+								{ LetType($2, $4::$5, $7) }
 	| FST single_expr			{ Projection(false, $2) }
 	| SND single_expr			{ Projection(true, $2) }
 	| IF expression THEN expression ELSE single_expr
@@ -84,6 +88,7 @@ member_expr:
 simple_expr:
 	| LPAREN expression RPAREN	{ $2 }
 	| IDENTIFIER				{ Var($1) }
+	| CONSTRUCTOR				{ Constructor($1) }
 	| INTEGER					{ Int($1) }
 	| BOOLEAN					{ Bool($1) }
 	| LPAREN expression COMMA expression RPAREN
@@ -115,8 +120,20 @@ simple_type:
 	| INT						{ TInt }
 	| BOOL						{ TBool }
 	| UNIT						{ TUnit }
+	| IDENTIFIER				{ Typevar $1 }
 
 record_type_list:
 	| IDENTIFIER COLON type		{ [($1, $3)] }
 	| IDENTIFIER COLON type COMMA record_type_list
 								{ ($1, $3)::$5 }
+
+adt_member:
+	| CONSTRUCTOR type_list		{ ($1, $2) }
+
+type_list:
+	| 							{ [] }
+	| type type_list			{ $1::$2 }
+
+adt_list:
+	| 							{ [] }
+	| BAR adt_member adt_list	{ $2::$3 }

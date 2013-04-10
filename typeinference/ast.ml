@@ -22,6 +22,9 @@ type ltype =
 	| TRef of ltype
 	| TRecord of (string * ltype) list
 	| TForAll of string list * ltype
+	| TADT of adt
+and adt = adt_cons list
+and adt_cons = string * ltype list
 
 type expr =
 	Var of string
@@ -29,6 +32,7 @@ type expr =
 	| Application of expr * expr
 	| Let of string * ltype * expr * expr
 	| LetRec of string * ltype * expr * expr
+	| LetType of string * adt * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr
@@ -48,6 +52,19 @@ type expr =
 	| Record of (string * expr) list
 	| Member of expr * string
 	| Unit
+	| Constructor of string
+	| ADTInstance of string * expr list
+
+type value =
+	| VInt of int
+	| VBool of bool
+	| VAbstraction of string * ltype * expr
+	| VReference of value ref
+	| VRecord of (string * value) list
+	| VUnit
+	| VConstructor of string * value
+	| VPair of value * value
+	| VInjection of bool * value
 
 let join glue =
 	List.fold_left (fun a e ->
@@ -71,6 +88,7 @@ let rec string_of_type t = match t with
 			start ^ l ^ " : " ^ string_of_type t in
 		"{" ^ List.fold_left foldf "" lst ^ "}"
 	| TForAll(lst, t) -> "forall " ^ join ", " lst ^ ". " ^ string_of_type t
+	| TADT(lst) -> join " | " (List.map (fun (name, args) -> name ^ " " ^ join " " (List.map string_of_type args)) lst)
 
 let f_of_binop op = match op with
 	| Plus -> (+)
@@ -133,6 +151,27 @@ let rec string_of_expr e =
 			start ^ l ^ " = " ^ string_of_expr e in
 		"{" ^ List.fold_left foldf "" lst ^ "}"
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
+	| Constructor n -> n
+	| ADTInstance(n, lst) -> n ^ " " ^ join " " (List.map string_of_expr lst)
+	| LetType(s, adt, e) -> "type " ^ s ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
+
+let rec string_of_value e =
+	match e with
+	| VUnit -> "()"
+	| VInt i -> string_of_int i
+	| VBool true -> "true"
+	| VBool false -> "false"
+	| VAbstraction(x, t, e1) -> "\\" ^ x ^ " : " ^ string_of_type t ^ ". " ^ string_of_expr e1
+	| VPair(v1, v2) -> "(" ^ string_of_value v1 ^ ", " ^ string_of_value v2 ^ ")"
+	| VInjection(false, v) -> "inl " ^ string_of_value e
+	| VInjection(true, v) -> "inr " ^ string_of_value e
+	| VReference _ -> "<loc>"
+	| VRecord lst ->
+		let foldf accum (l, e) =
+			let start = if accum = "" then "" else accum ^ ", " in
+			start ^ l ^ " = " ^ string_of_value e in
+		"{" ^ List.fold_left foldf "" lst ^ "}"
+	| VConstructor(c, v) -> c ^ " " ^ string_of_value v
 
 let new_typevar =
 	let current = ref 0 in

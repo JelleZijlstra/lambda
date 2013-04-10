@@ -38,6 +38,9 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| TRef t' -> free_variables t'
 	| TRecord lst -> List.fold_left VariableSet.union VariableSet.empty (List.map (fun (_, t) -> free_variables t) lst)
 	| TForAll(lst, t') -> List.fold_left (fun x y -> VariableSet.remove y x) (free_variables t') lst
+	| TADT(lst) ->
+		let mapf (_, t) = List.fold_left VariableSet.union VariableSet.empty (List.map free_variables t) in
+		List.fold_left VariableSet.union VariableSet.empty (List.map mapf lst)
 
 let free_variables_context (c : context) =
 	TypingContext.fold (fun _ t a -> VariableSet.union (free_variables t) a) c VariableSet.empty
@@ -52,6 +55,9 @@ let rec replace_in_type typevar new_type t =
 	| TRef t -> TRef(replace_in_type typevar new_type t)
 	| TRecord lst -> TRecord(List.map (fun (l, t) -> l, replace_in_type typevar new_type t) lst)
 	| TForAll(lst, t') -> if List.mem typevar lst then t else TForAll(lst, replace_in_type typevar new_type t')
+	| TADT(lst) ->
+		let mapf (l, t) = l, List.map (replace_in_type typevar new_type) t in
+		TADT(List.map mapf lst)
 
 let quantify (ctxt : context) (t : ltype) : ltype =
 	let vars = VariableSet.diff (free_variables t) (free_variables_context ctxt) in
@@ -84,6 +90,7 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| TRef t' -> is_free_variable t t'
 	| TRecord lst -> List.exists (fun (l, t') -> is_free_variable t t') lst
 	| TForAll(lst, t') -> not (List.mem t lst) && is_free_variable t t'
+	| TADT(lst) -> List.exists (fun (_, t') -> List.exists (is_free_variable t) t') lst
 
 let rec unify (cs : ConstraintSet.t) : substitution =
 	try (let chosen = ConstraintSet.choose cs in
@@ -135,6 +142,7 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 	| TForAll(lst, t') ->
 		let new_set = List.fold_left (fun a e -> VariableSet.add e a) b lst in
 		TForAll(lst, apply_substitution s t' new_set)
+	| TADT lst -> TADT(List.map (fun (l, t) -> (l, List.map (fun t -> apply_substitution s t b) t)) lst)
 
 let rec get_type (e : expr) (c : context) : type_cs =
 	match e with
@@ -253,6 +261,17 @@ let rec get_type (e : expr) (c : context) : type_cs =
 		let tv = Ast.new_typevar() in
 		let new_cs = ConstraintSet.add (HasLabel(t, l, tv)) cs in
 		Type(tv, new_cs)
+	| Constructor n -> (try Type(instantiate (TypingContext.find n c), em)
+		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
+	| LetType(name, lst, e) ->
+		let tv = Typevar name in
+		let foldf rest (name, lst) =
+			let t = List.fold_left (fun rest t -> TFunction(t, rest)) tv lst in
+			TypingContext.add name t rest in
+		let new_tc = List.fold_left foldf c lst in
+		let Type(t1, cs1) = get_type e new_tc in
+		Type(t1, ConstraintSet.add (Equals(tv, TADT lst)) cs1)
+	| ADTInstance(_, _) -> raise(TypeError("Should not appear here"))
 
 let print_cs cs = ConstraintSet.fold (fun e a -> (match e with
 	| Equals(t1, t2) -> "\t" ^ string_of_type t1 ^ " = " ^ string_of_type t2
