@@ -162,7 +162,7 @@ let rec string_of_expr e =
 		"{" ^ List.fold_left foldf "" lst ^ "}"
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
-	| ADTInstance(n, lst) -> n ^ " " ^ join " " (List.map string_of_expr lst)
+	| ADTInstance(n, lst) -> "(" ^ n ^ " " ^ join " " (List.map string_of_expr lst) ^ ")"
 	| LetType(s, params, adt, e) ->
 		let params_str = List.fold_left (^) "" (List.map ((^) " ") params) in
 		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e

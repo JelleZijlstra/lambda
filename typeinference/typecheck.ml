@@ -296,11 +296,11 @@ let rec get_type (e : expr) (c : context) : type_cs =
 			| PConstructor(x, lst) ->
 				let xt = (try instantiate (TypingContext.find x c)
 					with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
-				let foldf (vars, cs, t) p =
+				let foldf p (vars, cs, t) =
 					let t' = Ast.new_typevar() in
 					let (vars', cs') = type_pattern p t' cs in
 					(vars' @ vars, cs', TFunction(t', t)) in
-				let vars, cs, other_t = List.fold_left foldf ([], cs, t) lst in
+				let vars, cs, other_t = List.fold_right foldf lst ([], cs, t) in
 				let cs = ConstraintSet.add (Equals(xt, other_t)) cs in
 				(vars, cs) in
 			let vars, cs = type_pattern p t1 cs in
