@@ -30,17 +30,17 @@ expression:
 
 single_expr:
 	| BACKSLASH IDENTIFIER DOT single_expr
-								{ Abstraction($2, new_typevar(), $4) }
+								{ Abstraction($2, None, $4) }
 	| BACKSLASH IDENTIFIER COLON type DOT single_expr
-								{ Abstraction($2, $4, $6) }
+								{ Abstraction($2, Some $4, $6) }
 	| LET IDENTIFIER EQUALS expression IN single_expr
-								{ Let($2, new_typevar(), $4, $6) }
+								{ Let($2, None, $4, $6) }
 	| LET IDENTIFIER COLON type EQUALS expression IN single_expr
-								{ Let($2, $4, $6, $8) }
+								{ Let($2, Some $4, $6, $8) }
 	| LET REC IDENTIFIER EQUALS expression IN single_expr
-								{ LetRec($3, new_typevar(), $5, $7) }
+								{ LetRec($3, None, $5, $7) }
 	| LET REC IDENTIFIER COLON type EQUALS expression IN single_expr
-								{ LetRec($3, $5, $7, $9) }
+								{ LetRec($3, Some $5, $7, $9) }
 	| TYPE IDENTIFIER parameter_list EQUALS adt_member adt_list IN single_expr
 								{ LetType($2, $3, $5::$6, $8) }
 	| FST single_expr			{ Projection(false, $2) }

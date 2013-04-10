@@ -1,0 +1,34 @@
+type list a = Nil | Cons a (list a) in
+let rec reduce = \f. \u. \l. match l with {
+	Nil -> u
+	| Cons hd tl -> f hd (reduce f u tl)
+} in
+let rec rev_append = \l1. \l2. match l1 with {
+	Nil -> l2
+	| Cons hd tl -> rev_append tl (Cons hd l2)
+} in
+let reverse = \l. rev_append l Nil in
+let append = \l1. \l2. rev_append (reverse l1) l2 in
+let append' = \l1. \l2. reduce Cons l2 l1 in
+let split = \f. \lst.
+	let rec split' = \lst. \l. \r. match lst with {
+		Nil -> (l, r)
+		| Cons hd tl ->
+			let rest = split' tl l r in
+			let l' = fst rest in
+			let r' = snd rest in
+			if f hd then (Cons hd l', r') else (l', Cons hd r')
+	} in
+	split' lst Nil Nil in
+let rec qsort = \lst. match lst with {
+	Nil -> Nil
+	| Cons hd Nil -> Cons hd Nil
+	| Cons hd tl ->
+		let ls = split (\x. x < hd) tl in
+		append (qsort (fst ls)) (Cons hd (qsort (snd ls)))
+} in
+
+let l1 = Cons 3 (Cons 4 Nil) in
+let l2 = Cons 1 (Cons 2 Nil) in
+let l3 = Cons 5 (Cons 6 (Cons 3 (Cons 2 (Cons 7 (Cons 1 (Cons 9 (Cons 0 Nil))))))) in
+(append' l2 l1, qsort l3)

@@ -29,10 +29,10 @@ and adt_cons = string * ltype list
 
 type expr =
 	Var of string
-	| Abstraction of string * ltype * expr
+	| Abstraction of string * ltype option * expr
 	| Application of expr * expr
-	| Let of string * ltype * expr * expr
-	| LetRec of string * ltype * expr * expr
+	| Let of string * ltype option * expr * expr
+	| LetRec of string * ltype option * expr * expr
 	| LetType of string * string list * adt * expr
 	| Int of int
 	| Bool of bool
@@ -75,6 +75,11 @@ type value =
 	| VConstructor of string * value
 	| VPair of value * value
 	| VInjection of bool * value
+
+type kind =
+	| KStar
+	| KArrow of kind * kind
+	| KVar of string
 
 let join glue =
 	List.fold_left (fun a e ->
@@ -134,12 +139,15 @@ let rec string_of_expr e =
 	| Int i -> string_of_int i
 	| Bool true -> "true"
 	| Bool false -> "false"
-	| Abstraction(x, t, e1) -> "\\" ^ x ^ " : " ^ string_of_type t ^ ". " ^ string_of_expr e1
+	| Abstraction(x, Some t, e1) -> "\\" ^ x ^ " : " ^ string_of_type t ^ ". " ^ string_of_expr e1
+	| Abstraction(x, None, e1) -> "\\" ^ x ^ ". " ^ string_of_expr e1
 	| Application(e1, (Application(_, _) as e2)) -> string_of_expr e1 ^ " (" ^ string_of_expr e2 ^ ")"
 	| Application(Abstraction(_, _, _) as e1, e2) -> "(" ^ string_of_expr e1 ^ ") " ^ string_of_expr e2
 	| Application(e1, e2) -> string_of_expr e1 ^ " " ^ string_of_expr e2
-	| Let(x, t, e1, e2) -> "let " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
-	| LetRec(x, t, e1, e2) -> "let rec " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
+	| Let(x, None, e1, e2) -> "let " ^ x ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
+	| Let(x, Some t, e1, e2) -> "let " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
+	| LetRec(x, None, e1, e2) -> "let rec " ^ x ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
+	| LetRec(x, Some t, e1, e2) -> "let rec " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
 	| Binop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop op ^ " " ^ string_of_expr e2
 	| Unop(op, e) -> string_of_unop op ^ " " ^ string_of_expr e
 	| Fix e -> "fix " ^ string_of_expr e
@@ -197,10 +205,20 @@ let rec string_of_value e =
 		"{" ^ List.fold_left foldf "" lst ^ "}"
 	| VConstructor(c, v) -> c ^ " " ^ string_of_value v
 
-let new_typevar =
+let rec string_of_kind k = match k with
+	| KStar -> "*"
+	| KArrow(k1, k2) -> "(" ^ string_of_kind k1 ^ " -> " ^ string_of_kind k2 ^ ")"
+	| KVar x -> x
+
+let new_typevar, new_kindvar =
 	let current = ref 0 in
-	fun () ->
+	let tv () =
 		let n = !current in
 		current := n + 1;
-		Typevar("typevar" ^ string_of_int n)
+		Typevar("typevar" ^ string_of_int n) in
+	let kv () =
+		let n = !current in
+		current := n + 1;
+		KVar("kindvar" ^ string_of_int n) in
+	tv, kv
 ;;

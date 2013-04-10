@@ -1,8 +1,8 @@
 open Ast
 
 let z =
-	let inner_z = Abstraction("x", TInt, Application(Var "f", Abstraction("y", TInt, Application(Application(Var "x", Var "x"), Var "y")))) in
-	Abstraction("f", TInt, Application(inner_z, inner_z))
+	let inner_z = Abstraction("x", None, Application(Var "f", Abstraction("y", None, Application(Application(Var "x", Var "x"), Var "y")))) in
+	Abstraction("f", None, Application(inner_z, inner_z))
 
 let translate_var v =
 	"v" ^ Str.global_replace (Str.regexp "'") "_u" v

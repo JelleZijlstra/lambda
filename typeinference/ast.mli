@@ -29,10 +29,10 @@ and adt_cons = string * ltype list
 
 type expr =
 	Var of string
-	| Abstraction of string * ltype * expr
+	| Abstraction of string * ltype option * expr
 	| Application of expr * expr
-	| Let of string * ltype * expr * expr
-	| LetRec of string * ltype * expr * expr
+	| Let of string * ltype option * expr * expr
+	| LetRec of string * ltype option * expr * expr
 	| LetType of string * string list * adt * expr
 	| Int of int
 	| Bool of bool
@@ -76,6 +76,11 @@ type value =
 	| VPair of value * value
 	| VInjection of bool * value
 
+type kind =
+	| KStar
+	| KArrow of kind * kind
+	| KVar of string
+
 val string_of_type : ltype -> string
 
 val f_of_binop : binop -> int -> int -> int
@@ -94,4 +99,8 @@ val string_of_expr : expr -> string
 
 val string_of_value : value -> string
 
+val string_of_kind: kind -> string
+
 val new_typevar : unit -> ltype
+
+val new_kindvar : unit -> kind

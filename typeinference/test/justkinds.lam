@@ -1,0 +1,5 @@
+type foo a b = F a in
+type bar a = D (foo a) in
+#type foo a b = F a | B b in
+#type bar a = C (foo a a) | D (foo a) in
+()
