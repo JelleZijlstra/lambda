@@ -151,22 +151,18 @@ adt_list:
 
 pattern:
 	| simple_pattern			{ $1 }
-	| CONSTRUCTOR internal_pattern_lst
-								{ PConstructor($1, $2) }
+	| pattern simple_pattern
+								{ PApplication($1, $2) }
 
 simple_pattern:
 	| UNDERSCORE				{ PAnything }
 	| IDENTIFIER				{ PVariable $1 }
 	| INTEGER					{ PInt $1 }
 	| BOOLEAN					{ PBool $1 }
+	| CONSTRUCTOR				{ PConstructor $1 }
 	| LPAREN pattern COMMA pattern RPAREN
 								{ PPair($2, $4) }
 	| LPAREN pattern RPAREN		{ $2 }
-
-internal_pattern_lst:
-	| 							{ [] }
-	| simple_pattern internal_pattern_lst
-								{ $1::$2 }
 
 pattern_list:
 	|							{ [] }

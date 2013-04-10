@@ -293,16 +293,16 @@ let rec get_type (e : expr) (c : context) : type_cs =
 				let vars1, cs1 = type_pattern p1 t1 cs in
 				let vars2, cs2 = type_pattern p2 t2 cs1 in
 				(vars1 @ vars2, ConstraintSet.add (Equals(t, TProduct(t1, t2))) cs2)
-			| PConstructor(x, lst) ->
+			| PConstructor x ->
 				let xt = (try instantiate (TypingContext.find x c)
 					with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
-				let foldf p (vars, cs, t) =
-					let t' = Ast.new_typevar() in
-					let (vars', cs') = type_pattern p t' cs in
-					(vars' @ vars, cs', TFunction(t', t)) in
-				let vars, cs, other_t = List.fold_right foldf lst ([], cs, t) in
-				let cs = ConstraintSet.add (Equals(xt, other_t)) cs in
-				(vars, cs) in
+				([], ConstraintSet.add (Equals(xt, t)) cs)
+			| PApplication(p1, p2) ->
+				let t1 = Ast.new_typevar() in
+				let t2 = Ast.new_typevar() in
+				let vars1, cs1 = type_pattern p1 t1 cs in
+				let vars2, cs2 = type_pattern p2 t2 cs1 in
+				(vars1 @ vars2, ConstraintSet.add (Equals(t1, TFunction(t2, t))) cs2) in
 			let vars, cs = type_pattern p t1 cs in
 			let new_tc = List.fold_left (fun rest (x, t) -> TypingContext.add x t rest) c vars in
 			let Type(t', cs') = get_type e new_tc in

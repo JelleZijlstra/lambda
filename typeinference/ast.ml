@@ -54,12 +54,13 @@ type expr =
 	| Member of expr * string
 	| Unit
 	| Constructor of string
-	| ADTInstance of string * expr list
+	| ADTInstance of expr * expr
 	| Match of expr * (pattern * expr) list
 and pattern =
 	PAnything
 	| PVariable of string
-	| PConstructor of string * pattern list
+	| PConstructor of string
+	| PApplication of pattern * pattern
 	| PInt of int
 	| PBool of bool
 	| PPair of pattern * pattern
@@ -162,7 +163,7 @@ let rec string_of_expr e =
 		"{" ^ List.fold_left foldf "" lst ^ "}"
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
-	| ADTInstance(n, lst) -> "(" ^ n ^ " " ^ join " " (List.map string_of_expr lst) ^ ")"
+	| ADTInstance(e1, e2) -> "(" ^ string_of_expr e1 ^ " " ^ string_of_expr e2 ^ ")"
 	| LetType(s, params, adt, e) ->
 		let params_str = List.fold_left (^) "" (List.map ((^) " ") params) in
 		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
@@ -171,8 +172,8 @@ let rec string_of_expr e =
 		"match " ^ string_of_expr e ^ " with " ^ join " | " patterns
 and string_of_pattern p = match p with
 	| PAnything -> "_"
-	| PVariable v -> v
-	| PConstructor(n, lst) -> n ^ " " ^ join " " (List.map string_of_pattern lst)
+	| PVariable v | PConstructor v -> v
+	| PApplication(p1, p2) -> string_of_pattern p1 ^ " " ^ string_of_pattern p2
 	| PInt n -> string_of_int n
 	| PBool true -> "true"
 	| PBool false -> "false"

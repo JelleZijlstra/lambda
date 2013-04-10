@@ -18,10 +18,10 @@ let get_unique_var_name : unit -> string =
 		"'" ^ (string_of_int index)
 
 let rec exists_in_pattern var p = match p with
-	| PVariable x when x = var -> true
-	| PConstructor(_, lst) -> List.exists (exists_in_pattern var) lst
+	| PVariable x | PConstructor x when x = var -> true
+	| PApplication(p1, p2)
 	| PPair(p1, p2) -> exists_in_pattern var p1 || exists_in_pattern var p2
-	| PVariable _ | PAnything | PBool _ | PInt _ -> false
+	| PVariable _ | PConstructor _ | PAnything | PBool _ | PInt _ -> false
 
 let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Var x | Constructor x -> var = x
@@ -80,8 +80,8 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Let(x, t, e1, e2) -> Let(x, t, substitute e1 var replacement, substitute e2 var replacement)
 	| LetRec(x, t, e1, e2) when x = var -> code
 	| LetRec(x, t, e1, e2) -> LetRec(x, t, substitute e1 var replacement, substitute e2 var replacement)
-	| LetType(x, _, lst, e) -> if List.exists (fun (n, _) -> n = var) lst then e else substitute e var replacement
-	| ADTInstance(n, lst) -> ADTInstance(n, List.map (fun e -> substitute e var replacement) lst)
+	| LetType(x, _, lst, e) -> substitute e var replacement
+	| ADTInstance(v1, v2) -> ADTInstance(v1, substitute v2 var replacement)
 	| Match(e, lst) ->
 		let mapf (p, e) = if exists_in_pattern var p then (p, e) else (p, substitute e var replacement) in
 		Match(substitute e var replacement, List.map mapf lst)
@@ -120,6 +120,7 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		| Abstraction(arg, _, body) ->
 			let substituted = substitute body arg e2' in
 			eval substituted s
+		| Constructor _ | ADTInstance(_, _) -> ADTInstance(e1', e2')
 		| _ -> failwith "This expression is not a function; it cannot be applied")
 	| Fix(Abstraction(arg, _, body)) ->
 		eval (substitute body arg e) s
@@ -162,17 +163,8 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		let substituted = substitute e2 x e1' in
 		eval substituted s
 	| ADTInstance(n, lst) -> ADTInstance(n, lst)
-	| LetType(_, _, lst, e) ->
-		let rec mk_lst frm t =
-			if frm = t then [] else ("v" ^ string_of_int frm)::(mk_lst (frm + 1) t) in
-		let foldf rest (n, t) =
-			let lst = mk_lst 0 (List.length t) in
-			let base = ADTInstance(n, List.map (fun v -> Var v) lst) in
-			let f = List.fold_right (fun v rest -> Abstraction(v, TUnit, rest)) lst base in
-			Let(n, TUnit, f, rest) in
-		let new_e = List.fold_left foldf e lst in
-		eval new_e s
-	| Constructor n -> eval (Var n) s
+	| LetType(_, _, lst, e) -> eval e s
+	| Constructor n -> Constructor n
 	| Match(e, lst) ->
 		let match_expr = eval e s in
 		let rec eval_pattern p e = match p with
@@ -189,12 +181,13 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 					| Some lst1, Some lst2 -> Some(lst1 @ lst2)
 					| _, _ -> None)
 				| _ -> failwith "Pair must be matched with pair")
-			| PConstructor(n, lst) -> (match e with
-				| ADTInstance(n', lst') when n = n' ->
-					List.fold_left2 (fun r p e ->
-						match r, eval_pattern p e with
-						| None, _ | _, None -> None
-						| Some lst, Some lst' -> Some(lst @ lst')) (Some []) lst lst'
+			| PConstructor v -> (match e with
+				| Constructor v' when v = v' -> Some []
+				| _ -> None)
+			| PApplication(p1, p2) -> (match e with
+				| ADTInstance(v1, v2) -> (match eval_pattern p1 v1, eval_pattern p2 v2 with
+					| Some lst1, Some lst2 -> Some(lst1 @ lst2)
+					| _, _ -> None)
 				| _ -> None) in
 		let rec eval_match lst = match lst with
 			| [] -> failwith "Inexhaustive pattern matching"

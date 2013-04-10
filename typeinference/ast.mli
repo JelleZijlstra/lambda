@@ -54,12 +54,13 @@ type expr =
 	| Member of expr * string
 	| Unit
 	| Constructor of string
-	| ADTInstance of string * expr list
+	| ADTInstance of expr * expr
 	| Match of expr * (pattern * expr) list
 and pattern =
 	PAnything
 	| PVariable of string
-	| PConstructor of string * pattern list
+	| PConstructor of string
+	| PApplication of pattern * pattern
 	| PInt of int
 	| PBool of bool
 	| PPair of pattern * pattern
