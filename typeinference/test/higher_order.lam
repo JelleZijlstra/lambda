@@ -1,0 +1,11 @@
+data int_cont_option cont = None | Some (cont int) in
+data list a = Nil | Cons a (list a) in
+let f = \o. match o with {
+	None -> print 0
+	| Some Nil -> print 1
+	| Some (Cons hd _) -> print hd
+} in
+(f None;
+f (Some Nil);
+f (Some (Cons 3 Nil));
+f)

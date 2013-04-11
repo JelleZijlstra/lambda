@@ -1,0 +1,20 @@
+data either a b = Left a | Right b in
+type with_err_code = either int in
+
+data list a = Nil | Cons a (list a) in
+type intlist = list int in
+
+data option a = None | Some a in
+
+let hd : option intlist -> with_err_code int = \l. match l with {
+	| None -> Left 0 # Error: no list passed
+	| Some Nil -> Left 1 # Error: empty list passed
+	| Some (Cons hd _) -> Right hd
+} in
+let hd = \l. match hd l with {
+	Left n -> n
+	| Right n -> n
+} in
+(print (hd None);
+print (hd (Some Nil));
+print (hd (Some (Cons 3 Nil))))
