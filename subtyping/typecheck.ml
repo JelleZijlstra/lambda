@@ -44,7 +44,6 @@ let rec is_subtype (t1 : ltype) (t2 : ltype) : bool =
 	| TRecord _, TRecord [] -> true
 	| TRecord((l1, hd1)::tl1), TRecord((l2, hd2)::tl2) ->
 		l1 = l2 && is_subtype hd1 hd2 && is_subtype (TRecord tl1) (TRecord tl2)
-	| TForAll(_, _), TForAll(_, _) -> false (* I have no idea *)
 	| _, _ -> false
 
 let rec lub (t1 : ltype) (t2 : ltype) : ltype =
@@ -86,7 +85,6 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| TFunction(t1, t2) -> VariableSet.union (free_variables t1) (free_variables t2)
 	| TRef t' -> free_variables t'
 	| TRecord lst -> List.fold_left VariableSet.union VariableSet.empty (List.map (fun (_, t) -> free_variables t) lst)
-	| TForAll(lst, t') -> List.fold_left (fun x y -> VariableSet.remove y x) (free_variables t') lst
 
 let free_variables_context (c : context) =
 	TypingContext.fold (fun _ t a -> VariableSet.union (free_variables t) a) c VariableSet.empty
@@ -100,15 +98,6 @@ let rec replace_in_type typevar new_type t =
 	| TSum(t1, t2) -> TSum(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| TRef t -> TRef(replace_in_type typevar new_type t)
 	| TRecord lst -> TRecord(List.map (fun (l, t) -> l, replace_in_type typevar new_type t) lst)
-	| TForAll(lst, t') -> if List.mem typevar lst then t else TForAll(lst, replace_in_type typevar new_type t')
-
-let quantify (ctxt : context) (t : ltype) : ltype =
-	let vars = VariableSet.diff (free_variables t) (free_variables_context ctxt) in
-	if VariableSet.is_empty vars then t else TForAll(VariableSet.elements vars, t)
-
-let instantiate t = match t with
-	| TForAll(lst, t') -> List.fold_left (fun t tv -> replace_in_type tv (new_typevar()) t) t' lst
-	| _ -> t
 
 exception ImpossibleConstraint of string
 
@@ -136,7 +125,6 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| TFunction(t1, t2) -> is_free_variable t t1 || is_free_variable t t2
 	| TRef t' -> is_free_variable t t'
 	| TRecord lst -> List.exists (fun (l, t') -> is_free_variable t t') lst
-	| TForAll(lst, t') -> not (List.mem t lst) && is_free_variable t t'
 
 let rec unify (cs : ConstraintSet.t) : substitution =
 	try (let chosen = ConstraintSet.choose cs in
@@ -156,10 +144,6 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 			unify new_cs
 		| Equals(TRef t0, TRef t0') ->
 			let new_cs = ConstraintSet.add (Equals(t0, t0')) new_set in
-			unify new_cs
-		| Equals(TForAll(_, _) as fa, t)
-		| Equals(t, (TForAll(_, _) as fa)) ->
-			let new_cs = ConstraintSet.add (Equals(t, instantiate fa)) new_set in
 			unify new_cs
 		| HasLabel(TRecord lst, l, t) ->
 			let t' = try List.assoc l lst with Not_found ->
@@ -250,9 +234,6 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 		with Not_found -> t)
 	| Typevar tv -> t
 	| TRecord(lst) -> TRecord(List.map (fun (l, t) -> (l, apply_substitution s t b)) lst)
-	| TForAll(lst, t') ->
-		let new_set = List.fold_left (fun a e -> VariableSet.add e a) b lst in
-		TForAll(lst, apply_substitution s t' new_set)
 
 let rec get_type (e : expr) (c : context) : type_cs =
 	match e with
@@ -260,23 +241,21 @@ let rec get_type (e : expr) (c : context) : type_cs =
 	| Bool _ -> Type(TBool, em)
 	| Unit -> Type(TUnit, em)
 	| Var x ->
-		(try Type(instantiate (TypingContext.find x c), em)
+		(try Type(TypingContext.find x c, em)
 			with Not_found -> raise (TypeError("Unbound variable: " ^ x)))
 	| Let(x, t, e1, e2) ->
 		let Type(t1, cs1) = get_type e1 c in
 		let subst = unify cs1 in
 		let t1' = apply_substitution subst t1 VariableSet.empty in
-		let t1'' = quantify c t1' in
-		let new_tc = TypingContext.add x t1'' c in
+		let new_tc = TypingContext.add x t1' c in
 		let Type(t2, cs2) = get_type e2 new_tc in
-		Type(t2, ConstraintSet.add (Equals(t, t1'')) (ConstraintSet.union cs1 cs2))
+		Type(t2, ConstraintSet.add (Equals(t, t1')) (ConstraintSet.union cs1 cs2))
 	| LetRec(x, t, e1, e2) ->
 		let e1_c = TypingContext.add x t c in
 		let Type(t1, cs1) = get_type e1 e1_c in
 		let subst = unify cs1 in
 		let t1' = apply_substitution subst t1 VariableSet.empty in
-		let t1'' = quantify e1_c t1' in
-		let new_tc = TypingContext.add x t1'' c in
+		let new_tc = TypingContext.add x t1' c in
 		let Type(t2, cs2) = get_type e2 new_tc in
 		Type(t2, ConstraintSet.add (Equals(t, t1')) (ConstraintSet.union cs1 cs2))
 	| Binop(_, e1, e2) ->

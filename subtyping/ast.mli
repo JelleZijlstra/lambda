@@ -21,7 +21,6 @@ type ltype =
 	| TSum of ltype * ltype
 	| TRef of ltype
 	| TRecord of (string * ltype) list
-	| TForAll of string list * ltype
 
 type expr =
 	Var of string
