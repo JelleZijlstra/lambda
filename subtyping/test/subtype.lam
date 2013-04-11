@@ -1,0 +1,2 @@
+let f = \x. if x = 3 then {bar = true, foo = 3} else {foo = 3} in
+((f 3).foo, (f 2).foo)

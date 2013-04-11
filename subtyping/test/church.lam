@@ -1,0 +1,41 @@
+# Church numerals
+let id : int -> int = \x : int. x in
+#let true = \a. \b. a in
+#let false = \a. \b. b in
+
+let zero : (int -> int) -> int -> int = \f : int -> int. \x : int. x in
+let succ : ((int -> int) -> int -> int) -> (int -> int) -> int -> int =
+	\n : (int -> int) -> int -> int. \f : int -> int. \x : int. f (n f x) in
+let plus : ((int -> int) -> int -> int) -> ((int -> int) -> int -> int) -> (int -> int) -> int -> int =
+	\m : (int -> int) -> int -> int. \n : (int -> int) -> int -> int. \f : int -> int. \x : int. m f (n f x) in
+let mult : ((int -> int) -> int -> int) -> ((int -> int) -> int -> int) -> (int -> int) -> int -> int =
+	\m : (int -> int) -> int -> int. \n : (int -> int) -> int -> int. \f : int -> int. m (n f) in
+#let sub : ((int -> int) -> int -> int) -> ((int -> int) -> int -> int) -> (int -> int) -> int -> int =
+#	\m : (int -> int) -> int -> int. \n : (int -> int) -> int -> int. (n pred) m in
+let iszero = \n. n (\x. false) true in
+
+let decode : ((int -> int) -> int -> int) -> int = \n : (int -> int) -> int -> int. n (\x : int. x + 1) 0 in
+
+let one : (int -> int) -> int -> int = succ zero in
+let one' : int = decode one in
+let two : (int -> int) -> int -> int = plus one one in
+let two' : int = decode two in
+let four : (int -> int) -> int -> int = mult two two in
+let four' : int = decode four in
+let sixteen : (int -> int) -> int -> int = mult four four in
+#let alot : (int -> int) -> int -> int = exp two sixteen in
+#let alot' : int = decode alot in
+
+#let fact' = \f. \x. ((iszero x) (\x'. one) (\x'. mult x (f f (pred x)))) id in
+#let fact = fact' fact' in
+#let six = fact (succ two) in
+#let six' = decode six in
+
+# Make it print out the results
+let x : int = print one' in
+let x : int = print two' in
+let x : int = print four' in
+#let x = print alot' in
+#\x. one' two' four' alot' six'
+
+42

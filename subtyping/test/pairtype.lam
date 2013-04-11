@@ -1,0 +1,2 @@
+let x : int * (int -> int) = (3, \x. 42) in
+x
