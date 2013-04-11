@@ -168,7 +168,7 @@ simple_pattern:
 
 pattern_list:
 	|							{ [] }
-	| BAR pattern ARROW single_expr pattern_list
+	| BAR pattern ARROW expression pattern_list
 								{ ($2, $4)::$5 }
 
 parameter_list:
