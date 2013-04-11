@@ -17,6 +17,7 @@ type ltype =
 	| TUnit
 	| TFunction of ltype * ltype
 	| Typevar of string
+	| TypeWithLabel of string * (string * ltype) list
 	| TProduct of ltype * ltype
 	| TSum of ltype * ltype
 	| TRef of ltype

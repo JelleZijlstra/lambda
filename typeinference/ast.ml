@@ -17,6 +17,7 @@ type ltype =
 	| TUnit
 	| TFunction of ltype * ltype
 	| Typevar of string
+	| TypeWithLabel of string * (string * ltype) list
 	| TProduct of ltype * ltype
 	| TSum of ltype * ltype
 	| TRef of ltype
@@ -97,6 +98,8 @@ let rec string_of_type t = match t with
 		"(" ^ string_of_type f ^ ") -> " ^ string_of_type t
 	| TFunction(a, b) -> string_of_type a ^ " -> " ^ string_of_type b
 	| Typevar t -> "'" ^ t
+	| TypeWithLabel(t, lst) -> t ^ " with "
+		^ join ", " (List.map (fun (l, t) -> l ^ " : " ^ string_of_type t) lst)
 	| TProduct(a, b) -> "(" ^ string_of_type a ^ " * " ^ string_of_type b ^ ")"
 	| TSum(a, b) -> "(" ^ string_of_type a ^ " | " ^ string_of_type b ^ ")"
 	| TRecord(lst) ->
