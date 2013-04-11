@@ -6,11 +6,6 @@ type kconstraint = KEquals of kind * kind
 
 type errmsg = string
 
-module VariableMap = Map.Make(struct
-	type t = string
-	let compare = compare
-end)
-
 module ConstraintSet = Set.Make(struct
 	type t = lconstraint
 	let compare = compare
@@ -27,21 +22,21 @@ module VariableSet = Set.Make(struct
 end)
 
 module Context = struct
-	type t = ltype VariableMap.t * kind VariableMap.t
+	type t = ltype VarMap.t * kind VarMap.t
 
-	let empty = VariableMap.empty, VariableMap.empty
+	let empty = VarMap.empty, VarMap.empty
 
 	let add_var v t (ts, ks) =
-		VariableMap.add v t ts, ks
+		VarMap.add v t ts, ks
 
-	let find_var v (ts, _) = VariableMap.find v ts
+	let find_var v (ts, _) = VarMap.find v ts
 
-	let fold_vars f u (ts, _) = VariableMap.fold f ts u
+	let fold_vars f u (ts, _) = VarMap.fold f ts u
 
 	let add_kind t k (ts, ks) =
-		ts, VariableMap.add t k ks
+		ts, VarMap.add t k ks
 
-	let find_kind t (_, ks) = VariableMap.find t ks
+	let find_kind t (_, ks) = VarMap.find t ks
 end
 
 let em = ConstraintSet.empty
@@ -106,8 +101,19 @@ let instantiate t = match t with
 
 exception ImpossibleConstraint of string
 
-type substitution = ltype VariableMap.t
-type ksubstitution = kind VariableMap.t
+type substitution = ltype VarMap.t
+type ksubstitution = kind VarMap.t
+
+let print_cs cs = ConstraintSet.fold (fun e a -> (match e with
+	| Equals(t1, t2) -> "\t" ^ string_of_type t1 ^ " = " ^ string_of_type t2
+	| HasLabel(t1, l, t2) -> "\t" ^ string_of_type t1 ^ " has label " ^ l ^ " of type " ^ string_of_type t2) ^ "\n" ^ a) cs ""
+
+let print_ks ks = KindConstraintSet.fold (fun (KEquals(k1, k2)) a ->
+	"\t" ^ string_of_kind k1 ^ " = " ^ string_of_kind k2 ^ "\n" ^ a) ks ""
+
+let print_substitution s =
+	let foldf x t rest = "\t" ^ x ^ " = " ^ string_of_type t ^ "\n" ^ rest in
+	VarMap.fold foldf s ""
 
 let set_map f s = ConstraintSet.fold (fun elt s -> ConstraintSet.add (f elt) s) s em
 
@@ -142,6 +148,14 @@ let rec is_free_kvar (t : string) (k : kind) = match k with
 	| KStar -> false
 	| KArrow(k1, k2) -> is_free_kvar t k1 || is_free_kvar t k2
 
+let add_label (x : string) (label : string) (t : ltype) (s : substitution) : substitution =
+	try match VarMap.find x s with
+		| TypeWithLabel(x', lst) when x = x' ->
+			VarMap.add x (TypeWithLabel(x', (label, t)::lst)) s
+		| _ -> s
+	with
+	| Not_found -> VarMap.add x (TypeWithLabel(x, [(label, t)])) s
+
 let rec unify (cs : ConstraintSet.t) : substitution =
 	try (let chosen = ConstraintSet.choose cs in
 		let new_set = ConstraintSet.remove chosen cs in
@@ -152,7 +166,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 		| Equals(Typevar t, t') when (not(is_free_variable t t')) ->
 			let new_cs = replace_type t t' new_set in
 			let rest = unify new_cs in
-			VariableMap.add t t' rest
+			VarMap.add t t' rest
 		| Equals(TProduct(t0, t1), TProduct(t0', t1'))
 		| Equals(TSum(t0, t1), TSum(t0', t1'))
 		| Equals(TParameterized(t0, t1), TParameterized(t0', t1'))
@@ -180,18 +194,20 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 				in
 				let new_cs = List.fold_left foldf new_set lst1 in
 				let result = unify new_cs in
-				VariableMap.add n t2 result
+				VarMap.add n t2 result
 			with Not_found ->
 				let types = string_of_type t1 ^ " and " ^ string_of_type t2 in
 				raise(ImpossibleConstraint("Cannot unify types: " ^ types)))
 		| HasLabel(Typevar n, l, t') ->
 			let new_type = TypeWithLabel(n, [l, t']) in
-			let new_cs = replace_type  n new_type new_set in
-			unify new_cs
+			let new_cs = replace_type n new_type new_set in
+			let result = unify new_cs in
+			add_label n l t' result
 		| HasLabel(TypeWithLabel(n, lst), l, t') ->
 			let new_type = TypeWithLabel(n, (l, t')::lst) in
-			let new_cs = replace_type  n new_type new_set in
-			unify new_cs
+			let new_cs = replace_type n new_type new_set in
+			let result = unify new_cs in
+			add_label n l t' result
 		| HasLabel(TRecord lst, l, t) ->
 			let t' = try VarMap.find l lst with Not_found ->
 				let msg = "Label " ^ l ^ " does not exist in type: " ^ string_of_type (TRecord lst) in
@@ -202,7 +218,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 		| Equals(t1, t2) ->
 			let types = string_of_type t1 ^ " and " ^ string_of_type t2 in
 			raise(ImpossibleConstraint("Cannot unify types: " ^ types)))
-	with Not_found -> VariableMap.empty
+	with Not_found -> VarMap.empty
 
 let rec unify_kinds (ks : KindConstraintSet.t) : ksubstitution =
 	try (let chosen = KindConstraintSet.choose ks in
@@ -213,7 +229,7 @@ let rec unify_kinds (ks : KindConstraintSet.t) : ksubstitution =
 		| KEquals(KVar k, k') when not (is_free_kvar k k') ->
 			let ks = replace_kind k k' ks in
 			let rest = unify_kinds ks in
-			VariableMap.add k k' rest
+			VarMap.add k k' rest
 		| KEquals(KArrow(k1a, k1b), KArrow(k2a, k2b)) ->
 			let ks = KindConstraintSet.add (KEquals(k1a, k1b)) ks in
 			let ks = KindConstraintSet.add (KEquals(k2a, k2b)) ks in
@@ -221,7 +237,7 @@ let rec unify_kinds (ks : KindConstraintSet.t) : ksubstitution =
 		| KEquals(k1, k2) ->
 			let kinds = string_of_kind k1 ^ " and " ^ string_of_kind k2 in
 			raise(ImpossibleConstraint("Cannot unify kinds: " ^ kinds)))
-	with Not_found -> VariableMap.empty
+	with Not_found -> VarMap.empty
 
 let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : ltype =
 	match t with
@@ -231,7 +247,7 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 	| TSum(t1, t2) -> TSum(apply_substitution s t1 b, apply_substitution s t2 b)
 	| TProduct(t1, t2) -> TProduct(apply_substitution s t1 b, apply_substitution s t2 b)
 	| Typevar tv when not (VariableSet.mem tv b) ->
-		(try apply_substitution s (VariableMap.find tv s) b
+		(try apply_substitution s (VarMap.find tv s) b
 		with Not_found -> t)
 	| Typevar tv -> t
 	| TRecord(lst) -> TRecord(VarMap.map (fun t -> apply_substitution s t b) lst)
@@ -240,7 +256,8 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 		TForAll(lst, apply_substitution s t' new_set)
 	| TADT lst -> TADT(List.map (fun (l, t) -> (l, List.map (fun t -> apply_substitution s t b) t)) lst)
 	| TParameterized(t1, t2) -> TParameterized(apply_substitution s t1 b, apply_substitution s t2 b)
-	| TypeWithLabel(_, _) -> failwith "Should not appear in substitution"
+	| TypeWithLabel(name, lst) ->
+		TypeWithLabel(name, List.map (fun (l, t) -> l, apply_substitution s t b) lst)
 
 let rec get_kind (t : ltype) (c : Context.t) : kind * KindConstraintSet.t =
 	let add = KindConstraintSet.add in
@@ -314,7 +331,9 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 	| Let(x, t, e1, e2) ->
 		let Type(t1, cs1, ks1) = get_type e1 c in
 		let subst = unify cs1 in
+		Printf.printf "Initial type:\n\t%s\nContraints:\n%s\nSubstitution:\n%s" (string_of_type t1) (print_cs cs1) (print_substitution subst);
 		let t1' = apply_substitution subst t1 VariableSet.empty in
+		Printf.printf "Final type:\n\t%s\n" (string_of_type t1');
 		let t1'' = quantify c t1' in
 		let new_tc = Context.add_var x t1'' c in
 		let Type(t2, cs2, ks2) = get_type e2 new_tc in
@@ -491,13 +510,6 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let cs, ks = List.fold_left foldf (cs1, ks1) lst in
 		Type(res_tv, cs, ks)
 
-let print_cs cs = ConstraintSet.fold (fun e a -> (match e with
-	| Equals(t1, t2) -> "\t" ^ string_of_type t1 ^ " = " ^ string_of_type t2
-	| HasLabel(t1, l, t2) -> "\t" ^ string_of_type t1 ^ " has label " ^ l ^ " of type " ^ string_of_type t2) ^ "\n" ^ a) cs ""
-
-let print_ks ks = KindConstraintSet.fold (fun (KEquals(k1, k2)) a ->
-	"\t" ^ string_of_kind k1 ^ " = " ^ string_of_kind k2 ^ "\n" ^ a) ks ""
-
 let typecheck e verbose =
 	try let Type(t, cs, ks) = get_type e Context.empty in
 		(try
@@ -508,6 +520,7 @@ let typecheck e verbose =
 			let subst = unify cs in
 			if verbose then
 				let res_t = apply_substitution subst t VariableSet.empty in
+				Printf.printf "Substitution:\n%s" (print_substitution subst);
 				Printf.printf "Final type: %s\n" (string_of_type res_t)
 			else ignore subst;
 			None

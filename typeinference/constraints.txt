@@ -1,0 +1,26 @@
+Currently, type checking fails to reject the following program:
+
+	let x = \f. f.bar in
+	x {baz = 3, foo = 4}
+
+The inferred type for f is \forall a, b. a -> b; the constraint on a that it
+must have the label bar is lost.
+
+I can think of two solutions:
+- During instantiation, copy over any existing constraints on the type
+  variables instantiated to the new variables. For example, unification
+  on f above will yield the constraint HasLabel(a, bar, b). If we
+  instantiate x with types tv1, tv2, we would like to have the constraint
+  HasLabel(tv1, bar, tv2) added.
+- Introduce a form of constraint-based polymorphism (leading the way towards
+  typeclasses). f would be of type \forall b, a with bar = b. a -> b.
+  Instantiation with tv1, tv2 would instantiate the constraint
+  HasLabel(tv1, bar, tv2).
+
+The current implementation uses a special type, TypeWithLabel, to indicate
+a type variable constrained to contain a certain label. However, there is
+no special code handling instantiation or quantification.
+
+This seems to work (e.g., twoinsts.lam, badinsts.lam), which is somewhat
+concerning because I believed that I would need to extend TForAll to contain
+constraints.

@@ -1,0 +1,2 @@
+let f = \x. x.bar in
+(f {bar = 3}, (f {bar = true, baz = 4}, f {bar = \x. x, foo = ()}))
