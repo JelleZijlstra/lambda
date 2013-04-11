@@ -11,6 +11,11 @@ type boolbinop =
 type unop =
 	Print
 
+module VarMap = Map.Make(struct
+	type t = string
+	let compare = compare
+end)
+
 type ltype =
 	| TInt
 	| TBool
@@ -21,7 +26,7 @@ type ltype =
 	| TProduct of ltype * ltype
 	| TSum of ltype * ltype
 	| TRef of ltype
-	| TRecord of (string * ltype) list
+	| TRecord of ltype VarMap.t
 	| TForAll of string list * ltype
 	| TADT of adt
 	| TParameterized of ltype * ltype
@@ -52,7 +57,7 @@ type expr =
 	| Dereference of expr
 	| Allocation of expr
 	| Reference of expr ref
-	| Record of (string * expr) list
+	| Record of expr VarMap.t
 	| Member of expr * string
 	| Unit
 	| Constructor of string
@@ -103,10 +108,10 @@ let rec string_of_type t = match t with
 	| TProduct(a, b) -> "(" ^ string_of_type a ^ " * " ^ string_of_type b ^ ")"
 	| TSum(a, b) -> "(" ^ string_of_type a ^ " | " ^ string_of_type b ^ ")"
 	| TRecord(lst) ->
-		let foldf accum (l, t) =
+		let foldf l t accum =
 			let start = if accum = "" then "" else accum ^ ", " in
 			start ^ l ^ " : " ^ string_of_type t in
-		"{" ^ List.fold_left foldf "" lst ^ "}"
+		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| TForAll(lst, t) -> "forall " ^ join ", " lst ^ ". " ^ string_of_type t
 	| TADT(lst) -> join " | " (List.map (fun (name, args) -> name ^ " " ^ join " " (List.map string_of_type args)) lst)
 	| TParameterized(t1, t2) -> string_of_type t1 ^ " " ^ string_of_type t2
@@ -170,10 +175,10 @@ let rec string_of_expr e =
 	| Dereference e -> "!" ^ string_of_expr e
 	| Reference _ -> "<loc>"
 	| Record lst ->
-		let foldf accum (l, e) =
+		let foldf l e accum =
 			let start = if accum = "" then "" else accum ^ ", " in
 			start ^ l ^ " = " ^ string_of_expr e in
-		"{" ^ List.fold_left foldf "" lst ^ "}"
+		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
 	| ADTInstance(e1, e2) -> "(" ^ string_of_expr e1 ^ " " ^ string_of_expr e2 ^ ")"

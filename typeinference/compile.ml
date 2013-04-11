@@ -14,11 +14,6 @@ let create_new_var : unit -> string =
 		n := curr + 1;
 		"v" ^ string_of_int curr ^ "_c"
 
-module VarMap = Map.Make(struct
-	type t = string
-	let compare = compare
-end)
-
 type desugar_ctxt = expr VarMap.t
 
 let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
@@ -38,7 +33,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 	| Assignment(e1, e2) -> Assignment(desugar e1 vm, desugar e2 vm)
 	| Dereference e -> Dereference(desugar e vm)
 	| Sequence(e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)
-	| Record lst -> Record(List.map (fun (l, e) -> (l, desugar e vm)) lst)
+	| Record lst -> Record(VarMap.map (fun e -> desugar e vm) lst)
 	| Member(e, l) -> Member(desugar e vm, l)
 	| Let(x, t, e1, e2) -> Application(Abstraction(x, t, desugar e2 vm), desugar e1 vm)
 	| LetRec(x, t, e1, e2) -> Application(Abstraction(x, t, desugar e2 vm), Fix(Abstraction(x, t, desugar e1 vm)))
@@ -117,8 +112,8 @@ let rec compile_rec e = match e with
 	| Dereference e -> "(" ^ compile_rec e ^ ").value"
 	| Sequence(e1, e2) -> "((function() { " ^ compile_rec e1 ^ "; return (" ^ compile_rec e2 ^ "); })())"
 	| Record lst ->
-		let foldf rest (l, e) = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
-		"{" ^ List.fold_left foldf "" lst ^ "}"
+		let foldf l e rest = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
+		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> "(" ^ compile_rec e ^ ")." ^ l
 	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
 	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
@@ -200,8 +195,8 @@ let rec compile_rec e = match e with
 	| Dereference e -> "(" ^ compile_rec e ^ "->'value')"
 	| Sequence(e1, e2) -> "((func: ; " ^ compile_rec e1 ^ "; " ^ compile_rec e2 ^ "; end)())"
 	| Record lst ->
-		let foldf rest (l, e) = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
-		"{" ^ List.fold_left foldf "" lst ^ "}"
+		let foldf l e rest = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
+		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> "((" ^ compile_rec e ^ ")->'" ^ l ^ "')"
 	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
 	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))

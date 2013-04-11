@@ -44,7 +44,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| LetADT(_, _, _, e)
 	| TypeSynonym(_, _, e)
 	| Injection(_, e) -> is_free_variable var e
-	| Record lst -> List.exists (fun (l, e) -> is_free_variable var e) lst
+	| Record lst -> VarMap.exists (fun _ e -> is_free_variable var e) lst
 	| Let(x, t, e1, e2) -> is_free_variable var e1 || (x <> var && is_free_variable var e2)
 	| LetRec(x, t, e1, e2) -> (x <> var) && (is_free_variable var e1 || is_free_variable var e2)
 	| Match(e, lst) ->
@@ -75,7 +75,7 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Injection(b, e) -> Injection(b, substitute e var replacement)
 	| Case(e1, e2, e3) -> Case(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
 	| Sequence(e1, e2) -> Sequence(substitute e1 var replacement, substitute e2 var replacement)
-	| Record lst -> Record(List.map (fun (l, e) -> l, substitute e var replacement) lst)
+	| Record lst -> Record(VarMap.map (fun e -> substitute e var replacement) lst)
 	| Member(e, l) -> Member(substitute e var replacement, l)
 	| Let(x, t, e1, e2) when x = var -> Let(x, t, substitute e1 var replacement, e2)
 	| Let(x, t, e1, e2) -> Let(x, t, substitute e1 var replacement, substitute e2 var replacement)
@@ -151,9 +151,9 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		| Reference r -> !r
 		| _ -> failwith "This expression is not a reference; it cannot be dereferenced")
 	| Sequence(e1, e2) -> let _ = eval e1 s in eval e2 s
-	| Record lst -> Record(List.map (fun (l, e) -> l, eval e s) lst)
+	| Record lst -> Record(VarMap.map (fun e -> eval e s) lst)
 	| Member(e, l) -> (match eval e s with
-		| Record lst -> (try List.assoc l lst
+		| Record lst -> (try VarMap.find l lst
 			with Not_found -> failwith("Unknown label: " ^ l))
 		| _ -> failwith "This expression is not a record; member access is not possible")
 	| Let(x, t, e1, e2) ->

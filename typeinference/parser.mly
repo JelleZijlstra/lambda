@@ -9,10 +9,8 @@
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<Ast.expr> single_expr
-%type<(string * Ast.expr) list> record_list
 %type<Ast.adt_cons> adt_member
 %type<Ast.adt> adt_list
-%type<(string * Ast.ltype) list> record_type_list
 %type<Ast.pattern> pattern
 %type<(Ast.pattern * Ast.expr) list> pattern_list
 %type<string> IDENTIFIER CONSTRUCTOR
@@ -102,14 +100,14 @@ simple_expr:
 	| LPAREN expression COMMA expression RPAREN
 								{ Pair($2, $4) }
 	| LPAREN RPAREN				{ Unit }
-	| LBRACE RBRACE				{ Record [] }
+	| LBRACE RBRACE				{ Record VarMap.empty }
 	| LBRACE record_list RBRACE	{ Record $2 }
 
 record_list:
 	| IDENTIFIER EQUALS expression
-								{ [($1, $3)] }
+								{ VarMap.singleton $1 $3 }
 	| IDENTIFIER EQUALS expression COMMA record_list
-								{ ($1, $3)::$5 }
+								{ VarMap.add $1 $3 $5 }
 
 type:
 	| product_type ARROW type	{ TFunction($1, $3) }
@@ -127,7 +125,7 @@ instantiated_type:
 
 simple_type:
 	| LPAREN type RPAREN		{ $2 }
-	| LBRACE RBRACE				{ TRecord [] }
+	| LBRACE RBRACE				{ TRecord VarMap.empty }
 	| LBRACE record_type_list RBRACE
 								{ TRecord $2 }
 	| INT						{ TInt }
@@ -136,9 +134,9 @@ simple_type:
 	| IDENTIFIER				{ Typevar $1 }
 
 record_type_list:
-	| IDENTIFIER COLON type		{ [($1, $3)] }
+	| IDENTIFIER COLON type		{ VarMap.singleton $1 $3 }
 	| IDENTIFIER COLON type COMMA record_type_list
-								{ ($1, $3)::$5 }
+								{ VarMap.add $1 $3 $5 }
 
 adt_member:
 	| CONSTRUCTOR type_list		{ ($1, List.rev $2) }

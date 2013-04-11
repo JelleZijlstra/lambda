@@ -11,6 +11,8 @@ type boolbinop =
 type unop =
 	Print
 
+module VarMap : Map.S with type key = string
+
 type ltype =
 	| TInt
 	| TBool
@@ -21,7 +23,7 @@ type ltype =
 	| TProduct of ltype * ltype
 	| TSum of ltype * ltype
 	| TRef of ltype
-	| TRecord of (string * ltype) list
+	| TRecord of ltype VarMap.t
 	| TForAll of string list * ltype
 	| TADT of adt
 	| TParameterized of ltype * ltype
@@ -52,7 +54,7 @@ type expr =
 	| Dereference of expr
 	| Allocation of expr
 	| Reference of expr ref
-	| Record of (string * expr) list
+	| Record of expr VarMap.t
 	| Member of expr * string
 	| Unit
 	| Constructor of string

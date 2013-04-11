@@ -59,8 +59,11 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| TParameterized(t1, t2)
 	| TFunction(t1, t2) -> VariableSet.union (free_variables t1) (free_variables t2)
 	| TRef t' -> free_variables t'
-	| TypeWithLabel(_, lst)
-	| TRecord lst -> List.fold_left VariableSet.union VariableSet.empty (List.map (fun (_, t) -> free_variables t) lst)
+	| TypeWithLabel(_, lst) ->
+		List.fold_left VariableSet.union VariableSet.empty (List.map (fun (_, t) -> free_variables t) lst)
+	| TRecord lst ->
+		let types = VarMap.fold (fun _ t rest -> free_variables t::rest) lst [] in
+		List.fold_left VariableSet.union VariableSet.empty types
 	| TForAll(lst, t') -> List.fold_left (fun x y -> VariableSet.remove y x) (free_variables t') lst
 	| TADT(lst) ->
 		let mapf (_, t) = List.fold_left VariableSet.union VariableSet.empty (List.map free_variables t) in
@@ -78,7 +81,7 @@ let rec replace_in_type typevar new_type t =
 	| TProduct(t1, t2) -> TProduct(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| TSum(t1, t2) -> TSum(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| TRef t -> TRef(replace_in_type typevar new_type t)
-	| TRecord lst -> TRecord(List.map (fun (l, t) -> l, replace_in_type typevar new_type t) lst)
+	| TRecord lst -> TRecord(VarMap.map (replace_in_type typevar new_type) lst)
 	| TForAll(lst, t') -> if List.mem typevar lst then t else TForAll(lst, replace_in_type typevar new_type t')
 	| TADT(lst) ->
 		let mapf (l, t) = l, List.map (replace_in_type typevar new_type) t in
@@ -129,7 +132,7 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| TParameterized(t1, t2)
 	| TFunction(t1, t2) -> is_free_variable t t1 || is_free_variable t t2
 	| TRef t' -> is_free_variable t t'
-	| TRecord lst -> List.exists (fun (l, t') -> is_free_variable t t') lst
+	| TRecord lst -> VarMap.exists (fun _ t' -> is_free_variable t t') lst
 	| TForAll(lst, t') -> not (List.mem t lst) && is_free_variable t t'
 	| TADT(lst) -> List.exists (fun (_, t') -> List.exists (is_free_variable t) t') lst
 	| TypeWithLabel(n, lst) -> n = t || List.exists (fun (_, t') -> is_free_variable t t') lst
@@ -143,6 +146,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 	try (let chosen = ConstraintSet.choose cs in
 		let new_set = ConstraintSet.remove chosen cs in
 		match chosen with
+		| Equals(TRecord l1, TRecord l2) when VarMap.equal (=) l1 l2 -> unify new_set
 		| Equals(t1, t2) when t1 = t2 -> unify new_set
 		| Equals(t', Typevar t)
 		| Equals(Typevar t, t') when (not(is_free_variable t t')) ->
@@ -171,7 +175,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 		| Equals(TRecord lst2 as t2, (TypeWithLabel(n, lst1) as t1)) ->
 			(try
 				let foldf rest (l, t) =
-					let t' = List.assoc l lst2 in
+					let t' = VarMap.find l lst2 in
 					ConstraintSet.add (Equals(t, t')) rest
 				in
 				let new_cs = List.fold_left foldf new_set lst1 in
@@ -189,7 +193,7 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 			let new_cs = replace_type  n new_type new_set in
 			unify new_cs
 		| HasLabel(TRecord lst, l, t) ->
-			let t' = try List.assoc l lst with Not_found ->
+			let t' = try VarMap.find l lst with Not_found ->
 				let msg = "Label " ^ l ^ " does not exist in type: " ^ string_of_type (TRecord lst) in
 				raise(ImpossibleConstraint msg) in
 			let new_cs = ConstraintSet.add (Equals(t', t)) new_set in
@@ -230,7 +234,7 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 		(try apply_substitution s (VariableMap.find tv s) b
 		with Not_found -> t)
 	| Typevar tv -> t
-	| TRecord(lst) -> TRecord(List.map (fun (l, t) -> (l, apply_substitution s t b)) lst)
+	| TRecord(lst) -> TRecord(VarMap.map (fun t -> apply_substitution s t b) lst)
 	| TForAll(lst, t') ->
 		let new_set = List.fold_left (fun a e -> VariableSet.add e a) b lst in
 		TForAll(lst, apply_substitution s t' new_set)
@@ -255,12 +259,17 @@ let rec get_kind (t : ltype) (c : Context.t) : kind * KindConstraintSet.t =
 	| Typevar tv ->
 		(try Context.find_kind tv c, kem
 		with Not_found -> raise(TypeError("Unbound type variable: " ^ tv)))
-	| TypeWithLabel(_, lst)
-	| TRecord lst ->
+	| TypeWithLabel(_, lst) ->
 		let foldf rest (_, t) =
 			let k, kc = get_kind t c in
 			add (KEquals(k, KStar)) (union kc rest) in
 		let kc = List.fold_left foldf kem lst in
+		KStar, kc
+	| TRecord lst ->
+		let foldf _ t rest =
+			let k, kc = get_kind t c in
+			add (KEquals(k, KStar)) (union kc rest) in
+		let kc = VarMap.fold foldf lst kem in
 		KStar, kc
 	| TForAll(lst, t') ->
 		let foldf (c, vars) x =
@@ -409,10 +418,10 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 	| Reference e ->
 		let Type(t, cs, ks) = get_type (!e) c in Type(TRef t, cs, ks)
  	| Record lst ->
-		let foldf (rest, cs, ks) (l, e) =
+		let foldf l e (rest, cs, ks) =
 			let Type(t, cs', ks') = get_type e c in
-			(l, t)::rest, ConstraintSet.union cs cs', KindConstraintSet.union ks ks' in
-		let t, cs, ks = List.fold_left foldf ([], em, kem) lst in
+			VarMap.add l t rest, ConstraintSet.union cs cs', KindConstraintSet.union ks ks' in
+		let t, cs, ks = VarMap.fold foldf lst (VarMap.empty, em, kem) in
 		Type(TRecord t, cs, ks)
 	| Member(e, l) ->
 		let Type(t, cs, ks) = get_type e c in
