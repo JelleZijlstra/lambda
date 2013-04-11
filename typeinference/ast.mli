@@ -57,6 +57,7 @@ type expr =
 	| Constructor of string
 	| ADTInstance of expr * expr
 	| Match of expr * (pattern * expr) list
+	| Error of string
 and pattern =
 	PAnything
 	| PVariable of string

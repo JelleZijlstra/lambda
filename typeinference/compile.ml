@@ -7,6 +7,87 @@ let z =
 let translate_var v =
 	"v" ^ Str.global_replace (Str.regexp "'") "_u" v
 
+let create_new_var : unit -> string =
+	let n = ref 0 in
+	fun () ->
+		let curr = !n in
+		n := curr + 1;
+		"v" ^ string_of_int curr ^ "_c"
+
+module VarMap = Map.Make(struct
+	type t = string
+	let compare = compare
+end)
+
+type desugar_ctxt = expr VarMap.t
+
+let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
+	| Var _ | Int _ | Bool _ | Unit | Error _ -> e
+	| Application(e1, e2) -> Application(desugar e1 vm, desugar e2 vm)
+	| Abstraction(arg, t, body) -> Abstraction(arg, t, desugar body vm)
+	| Binop(op, e1, e2) -> Binop(op, desugar e1 vm, desugar e2 vm)
+	| Boolbinop(op, e1, e2) -> Boolbinop(op, desugar e1 vm, desugar e2 vm)
+	| Unop(op, e) -> Unop(op, desugar e vm)
+	| Fix(e) -> Fix(desugar e vm)
+	| If(e1, e2, e3) -> If(desugar e1 vm, desugar e2 vm, desugar e3 vm)
+	| Pair(e1, e2) -> Pair(desugar e1 vm, desugar e2 vm)
+	| Projection(b, e) -> Projection(b, desugar e vm)
+	| Injection(b, e) -> Injection(b, desugar e vm)
+	| Case(e1, e2, e3) -> Case(desugar e1 vm, desugar e2 vm, desugar e3 vm)
+	| Allocation e -> Allocation(desugar e vm)
+	| Assignment(e1, e2) -> Assignment(desugar e1 vm, desugar e2 vm)
+	| Dereference e -> Dereference(desugar e vm)
+	| Sequence(e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)
+	| Record lst -> Record(List.map (fun (l, e) -> (l, desugar e vm)) lst)
+	| Member(e, l) -> Member(desugar e vm, l)
+	| Let(x, t, e1, e2) -> Application(Abstraction(x, t, desugar e2 vm), desugar e1 vm)
+	| LetRec(x, t, e1, e2) -> Application(Abstraction(x, t, desugar e2 vm), Fix(Abstraction(x, t, desugar e1 vm)))
+	| TypeSynonym(_, _, e) -> desugar e vm
+	| LetADT(_, _, lst, e) ->
+		(* ADT constructors are converted into functions that return nested
+			pairs of values. For example, Cons would become
+					\hd. \tl. [["Cons", hd], tl])
+			That means we can simply treat ADT construction as a function call.
+			Pattern matching can treat ADT deconstruction the same way as pair
+			deconstruction. *)
+		let foldf rest (name, lst) =
+			let vars = List.mapi (fun i _ -> "x" ^ string_of_int i) lst in
+			let result = List.fold_left (fun rest v -> Pair(rest, Var v)) (Constructor name) vars in
+			let f = List.fold_right (fun v rest -> Abstraction(v, None, rest)) vars result in
+			VarMap.add name f rest
+		in
+		let new_vm = List.fold_left foldf vm lst in
+		desugar e new_vm
+	| Constructor x -> VarMap.find x vm
+	| Reference _ | ADTInstance(_, _) -> failwith "Should not appear in code"
+	| Match(e, lst) ->
+		let x = create_new_var() in
+		let foldf rest (p, e) =
+			let rec compile_pattern p e cont = match p with
+			| PInt n -> If(Boolbinop(Equals, Int n, e), Injection(true, cont), Injection(false, Unit))
+			| PBool b -> If(Boolbinop(Equals, Bool b, e), Injection(true, cont), Injection(false, Unit))
+			| PAnything -> Injection(true, cont)
+			| PVariable x -> Injection(true, Let(x, None, e, cont))
+			| PApplication(p1, p2)
+			| PPair(p1, p2) ->
+				(* case match (fst e) c of \_. inl () | \x. match (snd e) x *)
+				let fst = Projection(false, e) in
+				let snd = Projection(true, e) in
+				let p2' = compile_pattern p2 snd cont in
+				let p1_failed = Abstraction("_", None, Injection(false, Unit)) in
+				let p1_succeeded = Abstraction("x", None, Var "x") in
+				Case(compile_pattern p1 fst p2', p1_failed, p1_succeeded)
+			| PConstructor x -> If(Boolbinop(Equals, Constructor x, e), Injection(true, cont), Injection(false, Unit))
+			in
+			let new_x = create_new_var() in
+			let compiled_p = compile_pattern p (Var x) (Abstraction(new_x, None, desugar e vm)) in
+			Case(compiled_p, Abstraction(new_x, None, rest), Abstraction(new_x, None, Application(Var new_x, Unit)))
+		in
+		let mtch = List.fold_left foldf (Error "Inexhaustive pattern match") (List.rev lst) in
+		Application(Abstraction(x, None, mtch), desugar e vm)
+
+let desugar e = desugar e VarMap.empty
+
 let rec compile_rec e = match e with
 	| Var x -> translate_var x
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ "(" ^ compile_rec e2 ^ "))"
@@ -19,6 +100,7 @@ let rec compile_rec e = match e with
 	| Fix(Abstraction(arg, t, body)) ->
 		(* Apply the Z combinator *)
 		compile_rec(Application(z, Abstraction(arg, t, body)))
+	| ADTInstance(_, _) | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
 	| Fix _ | Reference _ -> failwith "Impossible"
 	| If(e1, e2, e3) -> "((" ^ compile_rec e1 ^ ") ? (" ^ compile_rec e2 ^ ") : (" ^ compile_rec e3 ^ "))"
 	| Bool true -> "true"
@@ -40,8 +122,12 @@ let rec compile_rec e = match e with
 	| Member(e, l) -> "(" ^ compile_rec e ^ ")." ^ l
 	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
 	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| Error e -> "((function() { throw new Error(\"" ^ e ^ "\"); })())"
+	| Constructor x -> "\"" ^ x ^ "\""
 
-let compile e = "console.log(\"Result: \" + " ^ compile_rec e ^ ");"
+let compile e =
+	let e' = desugar e in
+	"console.log(\"Result: \" + " ^ compile_rec e' ^ ");"
 
 let rec compile_rec e = match e with
 	| Var x -> translate_var x
@@ -56,6 +142,7 @@ let rec compile_rec e = match e with
 	| Unop(Print, e) -> "(let e = " ^ compile_rec e ^ " in Printf.printf \"%d\\n\" e; e)"
 	| If(e1, e2, e3) -> "(if " ^ compile_rec e1 ^ " then " ^ compile_rec e2 ^ " else " ^ compile_rec e3 ^ ")"
 	| Fix(Abstraction(arg, t, body)) -> "(let rec " ^ translate_var arg ^ " = " ^ compile_rec body ^ " in " ^ translate_var arg ^ ")"
+	| ADTInstance(_, _) | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
 	| Fix _ | Reference _ -> failwith "Impossible"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(fst " ^ compile_rec e ^ ")"
@@ -70,6 +157,8 @@ let rec compile_rec e = match e with
 	| Member(e, l) -> failwith "Not implemented"
 	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
 	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| Error e -> "(failwith \"" ^ e ^ "\")"
+	| Constructor x -> "\"" ^ x ^ "\""
 
 let compile_ml e = "let _ = Printf.printf \"%d\\n\" (" ^ compile_rec e ^ ");;"
 
@@ -96,6 +185,7 @@ let rec compile_rec e = match e with
 	| Fix(Abstraction(arg, _, body)) ->
 		"((func: ; private " ^ translate_var arg ^ " = " ^ compile_rec body ^ "; "
 			^ translate_var arg ^ "; end) ())"
+	| LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _) | ADTInstance(_, _)
 	| Fix _ | Reference _ -> failwith "Impossible"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(" ^ compile_rec e ^ "->0)"
@@ -115,5 +205,9 @@ let rec compile_rec e = match e with
 	| Member(e, l) -> "((" ^ compile_rec e ^ ")->'" ^ l ^ "')"
 	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
 	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| Error e -> "(throw(Exception.new(\"" ^ e ^ "\")))"
+	| Constructor x -> "\"" ^ x ^ "\""
 
-let compile_eh e = "echo ('Result: ' + " ^ compile_rec e ^ ");"
+let compile_eh e =
+	let e' = desugar e in
+	"echo 'Result: '; printvar (" ^ compile_rec e' ^ ");"

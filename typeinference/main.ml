@@ -6,6 +6,7 @@ let main () =
 	let do_compile_to_eh = ref false in
 	let do_cbn = ref false in
 	let do_no_typecheck = ref false in
+	let do_verbose = ref false in
 
 	let arguments = [
 		("-c", Arg.Set do_compile, "Compile rather than run the program");
@@ -13,12 +14,13 @@ let main () =
 		("-e", Arg.Set do_compile_to_eh, "Compile to EH");
 		("-n", Arg.Set do_cbn, "Use call-by-name semantics");
 		("-t", Arg.Set do_no_typecheck, "Do not typecheck the program");
+		("-v", Arg.Set do_verbose, "Be verbose");
 		("file", Arg.Rest (fun str -> file := str), "File to run")
 	] in
 	Arg.parse arguments (fun str -> file := str) "Implementation of the untyped lambda calculus";
 
 	let com = Util.parse_file (!file) in
-	match if !do_no_typecheck then None else Typecheck.typecheck com with
+	match if !do_no_typecheck then None else Typecheck.typecheck com (!do_verbose) with
 	| None ->
 		if !do_compile
 		then let result = Compile.compile com in

@@ -57,6 +57,7 @@ type expr =
 	| Constructor of string
 	| ADTInstance of expr * expr
 	| Match of expr * (pattern * expr) list
+	| Error of string
 and pattern =
 	PAnything
 	| PVariable of string
@@ -180,6 +181,7 @@ let rec string_of_expr e =
 	| Match(e, lst) ->
 		let patterns = List.map (fun (p, e) -> string_of_pattern p ^ " -> " ^ string_of_expr e) lst in
 		"match " ^ string_of_expr e ^ " with " ^ join " | " patterns
+	| Error s -> "#error " ^ s
 and string_of_pattern p = match p with
 	| PAnything -> "_"
 	| PVariable v | PConstructor v -> v

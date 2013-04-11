@@ -28,7 +28,7 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Application(e1, e2)
 	| Pair(e1, e2) -> is_free_variable var e1 || is_free_variable var e2
 	| Abstraction(arg, _, body) -> (arg <> var) && (is_free_variable var body)
-	| Int _ | Bool _ | Reference _ | Unit | ADTInstance(_, _) -> false
+	| Int _ | Bool _ | Reference _ | Unit | ADTInstance(_, _) | Error _ -> false
 	| Assignment(e1, e2)
 	| Sequence(e1, e2)
 	| Binop(_, e1, e2)
@@ -55,7 +55,7 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Var(x) -> if x = var then replacement else Var x
 	| Constructor n -> if n = var then replacement else Constructor n
 	| Application(e1, e2) -> Application(substitute e1 var replacement, substitute e2 var replacement)
-	| Int _ | Bool _ | Reference _ | Unit -> code
+	| Int _ | Bool _ | Reference _ | Unit | Error _ -> code
 	| Binop(op, e1, e2) -> Binop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| Boolbinop(op, e1, e2) -> Boolbinop(op, substitute e1 var replacement, substitute e2 var replacement)
 	| If(e1, e2, e3) -> If(substitute e1 var replacement, substitute e2 var replacement, substitute e3 var replacement)
@@ -90,7 +90,7 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 
 let rec eval (e : expr) (s : semantics) : expr = match e with
 	| Var x -> failwith ("Unbound variable: " ^ x)
-	| Abstraction(_, _, _) | Reference _ -> e
+	| Abstraction(_, _, _) | Reference _ | Error _ -> e
 	| Int n -> Int n
 	| Bool b -> Bool b
 	| Unit -> Unit

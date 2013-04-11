@@ -44,8 +44,6 @@ module Context = struct
 	let find_kind t (_, ks) = VariableMap.find t ks
 end
 
-let verbose = true
-
 let em = ConstraintSet.empty
 let kem = KindConstraintSet.empty
 
@@ -416,7 +414,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let new_tc = Context.add_kind name kind c in
 		let Type(t1, cs1, ks1) = get_type e new_tc in
 		Type(t1, cs1, KindConstraintSet.union ks ks1)
-	| ADTInstance(_, _) -> raise(TypeError("Should not appear here"))
+	| ADTInstance(_, _) | Error _ -> raise(TypeError("Should not appear here"))
 	| Match(e, lst) ->
 		let Type(t1, cs1, ks1) = get_type e c in
 		let res_tv = Ast.new_typevar() in
@@ -458,7 +456,7 @@ let print_cs cs = ConstraintSet.fold (fun e a -> (match e with
 let print_ks ks = KindConstraintSet.fold (fun (KEquals(k1, k2)) a ->
 	"\t" ^ string_of_kind k1 ^ " = " ^ string_of_kind k2 ^ "\n" ^ a) ks ""
 
-let typecheck e =
+let typecheck e verbose =
 	try let Type(t, cs, ks) = get_type e Context.empty in
 		(try
 			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
