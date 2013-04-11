@@ -1,5 +1,5 @@
-let None = inl () in
-let Some = \val. inr val in
+let none = inl () in
+let some = \val. inr val in
 
 # Given two numbers m and n, gives a pair of the quotient and remainder. Enters
 # an infinite loop if n = 0.
@@ -18,7 +18,7 @@ let rec divmod = \m. \n.
 				inner_div (q + 1) (r - n) in
 		inner_div 0 m in
 
-let divide = \m. \n. if n = 0 then None else Some(fst(divmod m n)) in
+let divide = \m. \n. if n = 0 then none else some(fst(divmod m n)) in
 
 let x = case divide 100 10 of \x. 0 | \x. print x in
 

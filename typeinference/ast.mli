@@ -33,7 +33,8 @@ type expr =
 	| Application of expr * expr
 	| Let of string * ltype option * expr * expr
 	| LetRec of string * ltype option * expr * expr
-	| LetType of string * string list * adt * expr
+	| LetADT of string * string list * adt * expr
+	| TypeSynonym of string * ltype * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr

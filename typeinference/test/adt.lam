@@ -1,2 +1,3 @@
-type foo = Bar int | Baz bool in
+data foo = Bar int | Baz bool in
+type foo' = foo in
 Bar 3

@@ -33,7 +33,8 @@ type expr =
 	| Application of expr * expr
 	| Let of string * ltype option * expr * expr
 	| LetRec of string * ltype option * expr * expr
-	| LetType of string * string list * adt * expr
+	| LetADT of string * string list * adt * expr
+	| TypeSynonym of string * ltype * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr
@@ -172,9 +173,10 @@ let rec string_of_expr e =
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
 	| ADTInstance(e1, e2) -> "(" ^ string_of_expr e1 ^ " " ^ string_of_expr e2 ^ ")"
-	| LetType(s, params, adt, e) ->
+	| LetADT(s, params, adt, e) ->
 		let params_str = List.fold_left (^) "" (List.map ((^) " ") params) in
 		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
+	| TypeSynonym(n, t, e) -> "type " ^ n ^ " = " ^ string_of_type t ^ " in " ^ string_of_expr e
 	| Match(e, lst) ->
 		let patterns = List.map (fun (p, e) -> string_of_pattern p ^ " -> " ^ string_of_expr e) lst in
 		"match " ^ string_of_expr e ^ " with " ^ join " | " patterns

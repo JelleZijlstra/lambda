@@ -5,7 +5,7 @@
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
-%token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE
+%token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<Ast.expr> single_expr
@@ -41,8 +41,10 @@ single_expr:
 								{ LetRec($3, None, $5, $7) }
 	| LET REC IDENTIFIER COLON type EQUALS expression IN single_expr
 								{ LetRec($3, Some $5, $7, $9) }
-	| TYPE IDENTIFIER parameter_list EQUALS adt_member adt_list IN single_expr
-								{ LetType($2, $3, $5::$6, $8) }
+	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list IN single_expr
+								{ LetADT($2, $3, $5::$6, $8) }
+	| TYPE IDENTIFIER EQUALS type IN single_expr
+								{ TypeSynonym($2, $4, $6) }
 	| FST single_expr			{ Projection(false, $2) }
 	| SND single_expr			{ Projection(true, $2) }
 	| IF expression THEN expression ELSE single_expr

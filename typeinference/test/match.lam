@@ -1,4 +1,4 @@
-type foo = Foo int | Bar bool in
+data foo = Foo int | Bar bool in
 let f = \x. match x with {
 	Foo n -> print n
 	| Bar b -> print (if b then 1 else 0) } in

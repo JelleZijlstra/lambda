@@ -1,4 +1,4 @@
-type t = C1 int | C2 bool bool | C3 (int * bool) in
+data t = C1 int | C2 bool bool | C3 (int * bool) in
 let f = \t. match t with {
 	| C1 3 -> print 3
 	| C1 _ -> print 1

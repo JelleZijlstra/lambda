@@ -41,7 +41,8 @@ let rec is_free_variable (var : string) (code : expr) : bool = match code with
 	| Member(e, _)
 	| Fix e -> is_free_variable var e
 	| Projection(_, e)
-	| LetType(_, _, _, e)
+	| LetADT(_, _, _, e)
+	| TypeSynonym(_, _, e)
 	| Injection(_, e) -> is_free_variable var e
 	| Record lst -> List.exists (fun (l, e) -> is_free_variable var e) lst
 	| Let(x, t, e1, e2) -> is_free_variable var e1 || (x <> var && is_free_variable var e2)
@@ -80,7 +81,8 @@ let rec substitute (code : expr) (var : string) (replacement : expr) : expr = ma
 	| Let(x, t, e1, e2) -> Let(x, t, substitute e1 var replacement, substitute e2 var replacement)
 	| LetRec(x, t, e1, e2) when x = var -> code
 	| LetRec(x, t, e1, e2) -> LetRec(x, t, substitute e1 var replacement, substitute e2 var replacement)
-	| LetType(x, _, lst, e) -> substitute e var replacement
+	| TypeSynonym(_, _, e) (* Safe to just erase these things from the expression *)
+	| LetADT(_, _, _, e) -> substitute e var replacement
 	| ADTInstance(v1, v2) -> ADTInstance(v1, substitute v2 var replacement)
 	| Match(e, lst) ->
 		let mapf (p, e) = if exists_in_pattern var p then (p, e) else (p, substitute e var replacement) in
@@ -163,7 +165,8 @@ let rec eval (e : expr) (s : semantics) : expr = match e with
 		let substituted = substitute e2 x e1' in
 		eval substituted s
 	| ADTInstance(n, lst) -> ADTInstance(n, lst)
-	| LetType(_, _, lst, e) -> eval e s
+	| TypeSynonym(_, _, e) (* Type declarations are ignored at runtime *)
+	| LetADT(_, _, _, e) -> eval e s
 	| Constructor n -> Constructor n
 	| Match(e, lst) ->
 		let match_expr = eval e s in

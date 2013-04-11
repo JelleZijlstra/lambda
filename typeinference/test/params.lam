@@ -1,4 +1,4 @@
-type option a = None | Some a in
+data option a = None | Some a in
 let f = \o. match o with {
 	None -> 0
 	| Some n -> n

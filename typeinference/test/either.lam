@@ -1,4 +1,4 @@
-type either a b = Left a | Right b in
+data either a b = Left a | Right b in
 let x = Left 3 in
 let y = Right true in
 let f = \e. match e with {

@@ -50,6 +50,8 @@ rule token = parse
 | "inr"	{ INR }
 | "type"
 		{ TYPE }
+| "data"
+		{ DATA }
 | "match"
 		{ MATCH }
 | "with"

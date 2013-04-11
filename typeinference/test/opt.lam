@@ -1,2 +1,2 @@
-type opt a = Some a in
+data opt a = Some a in
 Some 3

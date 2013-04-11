@@ -1,5 +1,5 @@
 #type bar a b = F int in
-type foo a = F (bar a) | G int in
+data foo a = F (bar a) | G int in
 let f = \e. match e with {
 	F x -> F x
 	| G n -> G (n + 1)

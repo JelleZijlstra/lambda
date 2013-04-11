@@ -390,25 +390,32 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		Type(tv, new_cs, ks)
 	| Constructor n -> (try Type(instantiate (Context.find_var n c), em, kem)
 		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
-	| LetType(name, params, lst, e) ->
+	| LetADT(name, params, lst, e) ->
 		let result_t = List.fold_left (fun r p -> TParameterized(r, Typevar p)) (Typevar name) params in
-		let kind = List.fold_left (fun r _ -> KArrow(KStar, r)) KStar params in
-		let new_tc = Context.add_kind name kind c in
-		let inner_tc = List.fold_left (fun r p -> Context.add_kind p (Ast.new_kindvar()) r) new_tc params in
+		let foldf (k, tc) p =
+			let kv = Ast.new_kindvar() in
+			(KArrow(kv, k), Context.add_kind p kv tc) in
+		let kind, tc = List.fold_left foldf (KStar, c) params in
+		let new_tc = Context.add_kind name kind tc in
 		let foldf (rest, ks) (name, lst) =
 			let inner_foldf (rest, ks) t =
-				let k, ks' = get_kind t inner_tc in
+				let k, ks' = get_kind t new_tc in
 				let new_ks = KindConstraintSet.add (KEquals(k, KStar)) (KindConstraintSet.union ks ks') in
 				TFunction(t, rest), new_ks in
 			let t, ks = List.fold_left inner_foldf (result_t, ks) lst in
 			let t = if params = [] then t else TForAll(params, t) in
 			Context.add_var name t rest, ks in
-		let tc', new_ks = List.fold_left foldf (inner_tc, kem) lst in
+		let tc', new_ks = List.fold_left foldf (tc, kem) lst in
 		(* Include variables from the ADT definition in the new context, but not kind bindings *)
 		let varc, _ = tc' in
 		let _, kindc = new_tc in
 		let Type(t1, cs1, ks1) = get_type e (varc, kindc) in
 		Type(t1, cs1, KindConstraintSet.add (KEquals(KVar name, kind)) (KindConstraintSet.union new_ks ks1))
+	| TypeSynonym(name, t, e) ->
+		let kind, ks = get_kind t c in
+		let new_tc = Context.add_kind name kind c in
+		let Type(t1, cs1, ks1) = get_type e new_tc in
+		Type(t1, cs1, KindConstraintSet.union ks ks1)
 	| ADTInstance(_, _) -> raise(TypeError("Should not appear here"))
 	| Match(e, lst) ->
 		let Type(t1, cs1, ks1) = get_type e c in
