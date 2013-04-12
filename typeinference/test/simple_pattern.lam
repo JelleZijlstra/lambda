@@ -1,0 +1,12 @@
+let f = \p. match p with {
+	(3, true) -> print 0
+	| (2, false) -> print 1
+	| (4, y) -> print (if y then 2 else 3)
+	| (x, _) -> print x
+} in
+let f' = \n. match n with {
+	0 -> print 1
+	| 1 -> print 0
+	| _ -> print n
+} in
+(f (3, true); f (2, false); f (4, true); f' 0; f' 1; f' 2)

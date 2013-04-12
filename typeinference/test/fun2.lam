@@ -1,0 +1,12 @@
+let f = \z. z.l2 z.l1 in
+let r1 = {
+    l1 = 42,
+    l2 = \x. x = 0,
+    l3 = true
+} in
+let r2 = {
+	l1 = 3,
+	l2 = \x. x + 1,
+	l3 = \x. x
+} in
+(f r1, (f r2, f))

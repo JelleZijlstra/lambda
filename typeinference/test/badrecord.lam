@@ -1,0 +1,2 @@
+let x = \f. f.bar in
+x {baz = 3, foo = 4}

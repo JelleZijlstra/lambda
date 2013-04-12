@@ -1,0 +1,12 @@
+# f : forall a. {foo : int, bar : bool, baz : a -> a} -> {foo : int, bar : bool, baz : a -> a}
+let f = \r. if r.foo = 3 then r else {foo = 3, bar = false, baz = \x. x} in
+
+# f2 : forall a. {foo : int, bar : bool, baz : a -> a} -> int
+let f2 = \r. if r.bar then 3 else (f r).foo in
+
+# f3 : {foo : int, bar : bool, baz : int -> int} -> int
+let f3 = \r. r.baz (if r.bar then 3 else (f r).foo) in
+
+let r = {foo = 3, bar = true, baz = \x. x * x} in
+let r2 = {foo = 4, bar = false, baz = \x. x} in
+(f2 r, (f3 r, f3 r2))

@@ -1,0 +1,2 @@
+data option a = None | Some a in
+None

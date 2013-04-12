@@ -1,0 +1,4 @@
+data foo a b = Foo a b | Bar b a in
+match (Foo 1 3) with {
+	(Foo a b) -> (print a; print 3)
+}

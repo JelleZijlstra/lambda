@@ -1,0 +1,5 @@
+# Checking that substitutions happen correctly on function types
+data list a = Nil | Cons a (list a) in
+
+let f = \x. Cons x Nil in
+(f 3, f)

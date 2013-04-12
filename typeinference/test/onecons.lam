@@ -1,0 +1,4 @@
+data foo = F int int in
+match F 3 4 with {
+	F x y -> (print x; print y)
+}
