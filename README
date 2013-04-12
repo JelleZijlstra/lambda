@@ -1,6 +1,6 @@
 Implementations of several variants of the lambda calculus in OCaml. For each
 variant, an interpreter and a compiler to JavaScript are provided. Currently,
-there are three variants:
+there are four variants:
 - untyped: Almost pure, untyped lambda calculus, with integers, a print
   statement, and let-in added in order to give the language a semblance of
   usability. The file untyped/test/ackermann.lam contains implementations
@@ -9,4 +9,8 @@ there are three variants:
   to enable recursion. I also added if statements and boolean variables.
 - typeinference: Like the previous implementation, but without the need to make
   every type explicit. The implementation uses constraint-based typing and the
-  Hindley-Milner algorithm. This variant also supports pairs and the unit type.
+  Hindley-Milner algorithm. This variant also supports pairs, the unit type,
+  sum types, algebraic data types, pattern matching, records, let-polymorphism,
+  and higher-order types.
+- subtyping: A fork of the typeinference variant with rudimentary support for
+  subtyping on records.
