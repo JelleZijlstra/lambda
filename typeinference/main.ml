@@ -4,7 +4,6 @@ let main () =
 	let do_compile = ref false in
 	let do_compile_to_ml = ref false in
 	let do_compile_to_eh = ref false in
-	let do_cbn = ref false in
 	let do_no_typecheck = ref false in
 	let do_verbose = ref false in
 
@@ -12,7 +11,6 @@ let main () =
 		("-c", Arg.Set do_compile, "Compile rather than run the program");
 		("-m", Arg.Set do_compile_to_ml, "Compile to OCaml");
 		("-e", Arg.Set do_compile_to_eh, "Compile to EH");
-		("-n", Arg.Set do_cbn, "Use call-by-name semantics");
 		("-t", Arg.Set do_no_typecheck, "Do not typecheck the program");
 		("-v", Arg.Set do_verbose, "Be verbose");
 		("file", Arg.Rest (fun str -> file := str), "File to run")
@@ -31,8 +29,8 @@ let main () =
 		else if !do_compile_to_eh
 		then let result = Compile.compile_eh com in
 			Printf.printf "%s\n" result
-		else let result = (if !do_cbn then Eval.eval_cbn else Eval.eval_cbv) com in
-			Printf.printf "Result: %s\n" (Ast.string_of_expr result)
+		else let result = Eval.eval com in
+			Printf.printf "Result: %s\n" (Ast.string_of_value result)
 	| Some error ->
 		Printf.printf "Error: %s\n" error; exit 1
 ;;

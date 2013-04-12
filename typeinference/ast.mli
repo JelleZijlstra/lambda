@@ -53,14 +53,13 @@ type expr =
 	| Assignment of expr * expr
 	| Dereference of expr
 	| Allocation of expr
-	| Reference of expr ref
 	| Record of expr VarMap.t
 	| Member of expr * string
 	| Unit
 	| Constructor of string
-	| ADTInstance of expr * expr
 	| Match of expr * (pattern * expr) list
 	| Error of string
+	| Dummy of value
 and pattern =
 	PAnything
 	| PVariable of string
@@ -69,17 +68,19 @@ and pattern =
 	| PInt of int
 	| PBool of bool
 	| PPair of pattern * pattern
-
-type value =
+and value =
 	| VInt of int
 	| VBool of bool
-	| VAbstraction of string * ltype * expr
-	| VReference of value ref
-	| VRecord of (string * value) list
 	| VUnit
-	| VConstructor of string * value
+	| VAbstraction of string * value VarMap.t * expr
+	| VReference of value ref
+	| VRecord of value VarMap.t
+	| VConstructor of string
+	| VADTInstance of value * value
 	| VPair of value * value
 	| VInjection of bool * value
+	| VError of string
+	| VDummy of expr * value VarMap.t
 
 type kind =
 	| KStar

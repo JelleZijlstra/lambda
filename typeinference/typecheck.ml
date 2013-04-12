@@ -441,8 +441,6 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let Type(t1, cs1, ks1) = get_type e1 c in
 		let Type(t2, cs2, ks2) = get_type e2 c in
 		Type(t2, ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
-	| Reference e ->
-		let Type(t, cs, ks) = get_type (!e) c in Type(TRef t, cs, ks)
  	| Record lst ->
 		let foldf l e (rest, cs, ks) =
 			let Type(t, cs', ks') = get_type e c in
@@ -482,7 +480,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let new_tc = Context.add_kind name kind c in
 		let Type(t1, cs1, ks1) = get_type e new_tc in
 		Type(t1, cs1, KindConstraintSet.union ks ks1)
-	| ADTInstance(_, _) | Error _ -> raise(TypeError("Should not appear here"))
+	| Dummy _ | Error _ -> raise(TypeError("Should not appear here"))
 	| Match(e, lst) ->
 		let Type(t1, cs1, ks1) = get_type e c in
 		let res_tv = Ast.new_typevar() in

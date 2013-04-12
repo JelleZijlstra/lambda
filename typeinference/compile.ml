@@ -54,7 +54,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 		let new_vm = List.fold_left foldf vm lst in
 		desugar e new_vm
 	| Constructor x -> VarMap.find x vm
-	| Reference _ | ADTInstance(_, _) -> failwith "Should not appear in code"
+	| Dummy _ -> failwith "Should not appear in code"
 	| Match(e, lst) ->
 		let x = create_new_var() in
 		let foldf rest (p, e) =
@@ -95,8 +95,8 @@ let rec compile_rec e = match e with
 	| Fix(Abstraction(arg, t, body)) ->
 		(* Apply the Z combinator *)
 		compile_rec(Application(z, Abstraction(arg, t, body)))
-	| ADTInstance(_, _) | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
-	| Fix _ | Reference _ -> failwith "Impossible"
+	| Dummy _ | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
+	| Fix _ -> failwith "Impossible"
 	| If(e1, e2, e3) -> "((" ^ compile_rec e1 ^ ") ? (" ^ compile_rec e2 ^ ") : (" ^ compile_rec e3 ^ "))"
 	| Bool true -> "true"
 	| Bool false -> "false"
@@ -137,8 +137,8 @@ let rec compile_rec e = match e with
 	| Unop(Print, e) -> "(let e = " ^ compile_rec e ^ " in Printf.printf \"%d\\n\" e; e)"
 	| If(e1, e2, e3) -> "(if " ^ compile_rec e1 ^ " then " ^ compile_rec e2 ^ " else " ^ compile_rec e3 ^ ")"
 	| Fix(Abstraction(arg, t, body)) -> "(let rec " ^ translate_var arg ^ " = " ^ compile_rec body ^ " in " ^ translate_var arg ^ ")"
-	| ADTInstance(_, _) | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
-	| Fix _ | Reference _ -> failwith "Impossible"
+	| Dummy _ | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
+	| Fix _ -> failwith "Impossible"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(fst " ^ compile_rec e ^ ")"
 	| Projection(true, e) -> "(snd " ^ compile_rec e ^ ")"
@@ -180,8 +180,8 @@ let rec compile_rec e = match e with
 	| Fix(Abstraction(arg, _, body)) ->
 		"((func: ; private " ^ translate_var arg ^ " = " ^ compile_rec body ^ "; "
 			^ translate_var arg ^ "; end) ())"
-	| LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _) | ADTInstance(_, _)
-	| Fix _ | Reference _ -> failwith "Impossible"
+	| LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
+	| Fix _ | Dummy _ -> failwith "Impossible"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(" ^ compile_rec e ^ "->0)"
 	| Projection(true, e) -> "(" ^ compile_rec e ^ "->1)"

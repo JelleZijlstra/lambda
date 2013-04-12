@@ -56,14 +56,13 @@ type expr =
 	| Assignment of expr * expr
 	| Dereference of expr
 	| Allocation of expr
-	| Reference of expr ref
 	| Record of expr VarMap.t
 	| Member of expr * string
 	| Unit
 	| Constructor of string
-	| ADTInstance of expr * expr
 	| Match of expr * (pattern * expr) list
 	| Error of string
+	| Dummy of value
 and pattern =
 	PAnything
 	| PVariable of string
@@ -72,17 +71,19 @@ and pattern =
 	| PInt of int
 	| PBool of bool
 	| PPair of pattern * pattern
-
-type value =
+and value =
 	| VInt of int
 	| VBool of bool
-	| VAbstraction of string * ltype * expr
-	| VReference of value ref
-	| VRecord of (string * value) list
 	| VUnit
-	| VConstructor of string * value
+	| VAbstraction of string * value VarMap.t * expr
+	| VReference of value ref
+	| VRecord of value VarMap.t
+	| VConstructor of string
+	| VADTInstance of value * value
 	| VPair of value * value
 	| VInjection of bool * value
+	| VError of string
+	| VDummy of expr * value VarMap.t
 
 type kind =
 	| KStar
@@ -173,7 +174,6 @@ let rec string_of_expr e =
 	| Assignment(e1, e2) -> string_of_expr e1 ^ " := " ^ string_of_expr e2
 	| Allocation e -> "ref " ^ string_of_expr e
 	| Dereference e -> "!" ^ string_of_expr e
-	| Reference _ -> "<loc>"
 	| Record lst ->
 		let foldf l e accum =
 			let start = if accum = "" then "" else accum ^ ", " in
@@ -181,7 +181,6 @@ let rec string_of_expr e =
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
-	| ADTInstance(e1, e2) -> "(" ^ string_of_expr e1 ^ " " ^ string_of_expr e2 ^ ")"
 	| LetADT(s, params, adt, e) ->
 		let params_str = List.fold_left (^) "" (List.map ((^) " ") params) in
 		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
@@ -190,6 +189,7 @@ let rec string_of_expr e =
 		let patterns = List.map (fun (p, e) -> string_of_pattern p ^ " -> " ^ string_of_expr e) lst in
 		"match " ^ string_of_expr e ^ " with " ^ join " | " patterns
 	| Error s -> "#error " ^ s
+	| Dummy v -> string_of_value v
 and string_of_pattern p = match p with
 	| PAnything -> "_"
 	| PVariable v | PConstructor v -> v
@@ -198,24 +198,26 @@ and string_of_pattern p = match p with
 	| PBool true -> "true"
 	| PBool false -> "false"
 	| PPair(p1, p2) -> "(" ^ string_of_pattern p1 ^ ", " ^ string_of_pattern p2 ^ ")"
-
-let rec string_of_value e =
+and string_of_value e =
 	match e with
 	| VUnit -> "()"
 	| VInt i -> string_of_int i
 	| VBool true -> "true"
 	| VBool false -> "false"
-	| VAbstraction(x, t, e1) -> "\\" ^ x ^ " : " ^ string_of_type t ^ ". " ^ string_of_expr e1
+	| VAbstraction(x, _, e1) -> "\\" ^ x ^ ". " ^ string_of_expr e1
 	| VPair(v1, v2) -> "(" ^ string_of_value v1 ^ ", " ^ string_of_value v2 ^ ")"
 	| VInjection(false, v) -> "inl " ^ string_of_value e
 	| VInjection(true, v) -> "inr " ^ string_of_value e
 	| VReference _ -> "<loc>"
 	| VRecord lst ->
-		let foldf accum (l, e) =
+		let foldf l e accum =
 			let start = if accum = "" then "" else accum ^ ", " in
 			start ^ l ^ " = " ^ string_of_value e in
-		"{" ^ List.fold_left foldf "" lst ^ "}"
-	| VConstructor(c, v) -> c ^ " " ^ string_of_value v
+		"{" ^ VarMap.fold foldf lst "" ^ "}"
+	| VConstructor c -> c
+	| VDummy(e, _) -> string_of_expr e
+	| VADTInstance(v1, v2) -> "(" ^ string_of_value v1 ^ " " ^ string_of_value v2 ^ ")"
+	| VError e -> "#error " ^ e
 
 let rec string_of_kind k = match k with
 	| KStar -> "*"
