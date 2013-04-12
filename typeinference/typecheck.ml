@@ -198,6 +198,12 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 			with Not_found ->
 				let types = string_of_type t1 ^ " and " ^ string_of_type t2 in
 				raise(ImpossibleConstraint("Cannot unify types: " ^ types)))
+		| Equals(TRecord lst1, TRecord lst2) when VarMap.cardinal lst1 = VarMap.cardinal lst2 ->
+			let foldf l t1 rest =
+				let t2 = VarMap.find l lst2 in
+				ConstraintSet.add (Equals(t1, t2)) rest in
+			let new_cs = VarMap.fold foldf lst1 new_set in
+			unify new_cs
 		| HasLabel(Typevar n, l, t') ->
 			let new_type = TypeWithLabel(n, [l, t']) in
 			let new_cs = replace_type n new_type new_set in
@@ -335,6 +341,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let t1' = apply_substitution subst t1 VariableSet.empty in
 		Printf.printf "Final type:\n\t%s\n" (string_of_type t1');
 		let t1'' = quantify c t1' in
+		Printf.printf "Final type (quantified):\n\t%s\n" (string_of_type t1'');
 		let new_tc = Context.add_var x t1'' c in
 		let Type(t2, cs2, ks2) = get_type e2 new_tc in
 		let ks = KindConstraintSet.union ks1 ks2 in
