@@ -251,15 +251,26 @@ let rec string_of_kind k = match k with
 	| KArrow(k1, k2) -> "(" ^ string_of_kind k1 ^ " -> " ^ string_of_kind k2 ^ ")"
 	| KVar x -> x
 
-let new_typevar, new_kindvar =
+let new_typevar =
 	let current = ref 0 in
-	let tv () =
+	fun () ->
 		let n = !current in
 		current := n + 1;
-		Typevar("typevar" ^ string_of_int n) in
-	let kv () =
+		Typevar("typevar" ^ string_of_int n)
+;;
+
+let new_kindvar =
+	let current = ref 0 in
+	fun () ->
 		let n = !current in
 		current := n + 1;
-		KVar("kindvar" ^ string_of_int n) in
-	tv, kv
+		KVar("kindvar" ^ string_of_int n)
+;;
+
+let next_id =
+	let current = ref 0 in
+	fun () ->
+		let n = !current in
+		current := n + 1;
+		string_of_int n
 ;;

@@ -1,0 +1,17 @@
+let f = \x.
+	data option a = None | Some a in
+	let f' = \x. match x with {
+		None -> 3
+		| Some v -> v + 1
+	} in
+	(f' None, f' (Some x))
+in
+let g = \x.
+	data option a b = None a | Some b in
+	let f' = \x. match x with {
+		Some _ -> 4
+		| None v -> v - 1
+	} in
+	(f' (Some true), f' (None x))
+in
+((f, g), (f 3, g 4))

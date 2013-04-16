@@ -119,3 +119,5 @@ val string_of_kind: kind -> string
 val new_typevar : unit -> ltype
 
 val new_kindvar : unit -> kind
+
+val next_id : unit -> string

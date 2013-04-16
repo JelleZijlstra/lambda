@@ -1,0 +1,2 @@
+data option a = None | Some (option a int) in
+42

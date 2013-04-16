@@ -521,7 +521,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let varc, _ = tc' in
 		let _, kindc = new_tc in
 		let Type(t1, cs1, ks1) = get_type e (varc, kindc) in
-		Type(t1, cs1, KindConstraintSet.add (KEquals(KVar name, kind)) (KindConstraintSet.union new_ks ks1))
+		Type(t1, cs1, KindConstraintSet.add (KEquals(KVar(name ^ "/" ^ next_id()), kind)) (KindConstraintSet.union new_ks ks1))
 	| In(TypeSynonym(name, t), e) ->
 		let kind, ks = get_kind t c in
 		let new_tc = Context.add_kind name kind c in
