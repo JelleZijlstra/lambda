@@ -502,7 +502,8 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 	| Constructor n -> (try Type(instantiate (Context.find_var n c), em, kem)
 		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
 	| In(LetADT(name, params, lst), e) ->
-		let result_t = List.fold_left (fun r p -> TParameterized(r, Typevar p)) (Typevar name) params in
+		let qualified_name = name ^ "/" ^ next_id() in
+		let result_t = List.fold_left (fun r p -> TParameterized(r, Typevar p)) (Typevar qualified_name) params in
 		let foldf (k, tc) p =
 			let kv = Ast.new_kindvar() in
 			(KArrow(kv, k), Context.add_kind p kv tc) in
@@ -521,7 +522,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let varc, _ = tc' in
 		let _, kindc = new_tc in
 		let Type(t1, cs1, ks1) = get_type e (varc, kindc) in
-		Type(t1, cs1, KindConstraintSet.add (KEquals(KVar(name ^ "/" ^ next_id()), kind)) (KindConstraintSet.union new_ks ks1))
+		Type(t1, cs1, KindConstraintSet.add (KEquals(KVar(qualified_name), kind)) (KindConstraintSet.union new_ks ks1))
 	| In(TypeSynonym(name, t), e) ->
 		let kind, ks = get_kind t c in
 		let new_tc = Context.add_kind name kind c in
