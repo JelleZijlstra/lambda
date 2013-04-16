@@ -30,17 +30,19 @@ type ltype =
 	| TForAll of string list * ltype
 	| TADT of adt
 	| TParameterized of ltype * ltype
+	| TModule of module_type_entry list
 and adt = adt_cons list
 and adt_cons = string * ltype list
+and module_type_entry =
+	| AbstractType of string * string list
+	| ConcreteType of string * string list * ltype
+	| Value of string * ltype
 
 type expr =
 	Var of string
 	| Abstraction of string * ltype option * expr
 	| Application of expr * expr
-	| Let of string * ltype option * expr * expr
-	| LetRec of string * ltype option * expr * expr
-	| LetADT of string * string list * adt * expr
-	| TypeSynonym of string * ltype * expr
+	| In of in_expr * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr
@@ -63,6 +65,7 @@ type expr =
 	| Match of expr * (pattern * expr) list
 	| Error of string
 	| Dummy of value
+	| Module of ltype option * in_expr list
 and pattern =
 	PAnything
 	| PVariable of string
@@ -84,6 +87,12 @@ and value =
 	| VInjection of bool * value
 	| VError of string
 	| VDummy of expr * value VarMap.t
+and in_expr =
+	| Let of string * ltype option * expr
+	| LetRec of string * ltype option * expr
+	| LetADT of string * string list * adt
+	| TypeSynonym of string * ltype
+	| SingleExpression of expr
 
 type kind =
 	| KStar
@@ -94,6 +103,8 @@ let join glue =
 	List.fold_left (fun a e ->
 		let start = if a = "" then "" else a ^ glue in
 		start ^ e) ""
+
+let ljoin glue lst = join "" (List.map (fun e -> glue ^ e) lst)
 
 let rec string_of_type t = match t with
 	| TInt -> "int"
@@ -116,6 +127,12 @@ let rec string_of_type t = match t with
 	| TForAll(lst, t) -> "forall " ^ join ", " lst ^ ". " ^ string_of_type t
 	| TADT(lst) -> join " | " (List.map (fun (name, args) -> name ^ " " ^ join " " (List.map string_of_type args)) lst)
 	| TParameterized(t1, t2) -> string_of_type t1 ^ " " ^ string_of_type t2
+	| TModule(ts) ->
+		let mapf entry = match entry with
+			| AbstractType(n, ps) -> "type " ^ n ^ ljoin " " ps
+			| ConcreteType(n, ps, t) -> "type " ^ n ^ ljoin " " ps ^ " = " ^ string_of_type t
+			| Value(n, t) -> n ^ " : " ^ string_of_type t in
+		join ", " (List.map mapf ts)
 
 let f_of_binop op = match op with
 	| Plus -> (+)
@@ -155,10 +172,7 @@ let rec string_of_expr e =
 	| Application(e1, (Application(_, _) as e2)) -> string_of_expr e1 ^ " (" ^ string_of_expr e2 ^ ")"
 	| Application(Abstraction(_, _, _) as e1, e2) -> "(" ^ string_of_expr e1 ^ ") " ^ string_of_expr e2
 	| Application(e1, e2) -> string_of_expr e1 ^ " " ^ string_of_expr e2
-	| Let(x, None, e1, e2) -> "let " ^ x ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
-	| Let(x, Some t, e1, e2) -> "let " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
-	| LetRec(x, None, e1, e2) -> "let rec " ^ x ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
-	| LetRec(x, Some t, e1, e2) -> "let rec " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
+	| In(e, e2) -> string_of_in_expr e ^ " in " ^ string_of_expr e2
 	| Binop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop op ^ " " ^ string_of_expr e2
 	| Unop(op, e) -> string_of_unop op ^ " " ^ string_of_expr e
 	| Fix e -> "fix " ^ string_of_expr e
@@ -181,15 +195,28 @@ let rec string_of_expr e =
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
-	| LetADT(s, params, adt, e) ->
-		let params_str = List.fold_left (^) "" (List.map ((^) " ") params) in
-		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt) ^ " in " ^ string_of_expr e
-	| TypeSynonym(n, t, e) -> "type " ^ n ^ " = " ^ string_of_type t ^ " in " ^ string_of_expr e
 	| Match(e, lst) ->
 		let patterns = List.map (fun (p, e) -> string_of_pattern p ^ " -> " ^ string_of_expr e) lst in
 		"match " ^ string_of_expr e ^ " with " ^ join " | " patterns
 	| Error s -> "#error " ^ s
 	| Dummy v -> string_of_value v
+	| Module(t, lst) ->
+		let t_str = match t with
+			| None -> ""
+			| Some t -> string_of_type t ^ "\n\t" in
+		let body = join "\n\t" (List.map string_of_in_expr lst) in
+		"module\n\t" ^ t_str ^ body ^ "\nend"
+and string_of_in_expr e = match e with
+	| Let(x, None, e1) -> "let " ^ x ^ " = " ^ string_of_expr e1
+	| Let(x, Some t, e1) -> "let " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1
+	| LetRec(x, None, e1) -> "let rec " ^ x ^ " = " ^ string_of_expr e1
+	| LetRec(x, Some t, e1) -> "let rec " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1
+	| LetADT(s, params, adt) ->
+		let params_str = List.fold_left (^) "" (List.map ((^) " ") params) in
+		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt)
+	| TypeSynonym(n, t) -> "type " ^ n ^ " = " ^ string_of_type t
+	| SingleExpression e -> string_of_expr e
+
 and string_of_pattern p = match p with
 	| PAnything -> "_"
 	| PVariable v | PConstructor v -> v

@@ -88,20 +88,21 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 	| Dereference e -> (match eval' e s with
 		| VReference r -> !r
 		| _ -> failwith "This expression is not a reference; it cannot be dereferenced")
+	| In(SingleExpression e1, e2)
 	| Sequence(e1, e2) -> let _ = eval' e1 s in eval' e2 s
 	| Record lst -> VRecord(VarMap.map (fun e -> eval' e s) lst)
 	| Member(e, l) -> (match eval' e s with
 		| VRecord lst -> (try VarMap.find l lst
 			with Not_found -> failwith("Unknown label: " ^ l))
 		| _ -> failwith "This expression is not a record; member access is not possible")
-	| Let(x, t, e1, e2) ->
+	| In(Let(x, t, e1), e2) ->
 		let e1' = eval' e1 s in
 		eval' e2 (VarMap.add x e1' s)
-	| LetRec(x, t, e1, e2) ->
+	| In(LetRec(x, t, e1), e2) ->
 		let e1' = eval' (Fix(Abstraction(x, t, e1))) s in
 		eval' e2 (VarMap.add x e1' s)
-	| TypeSynonym(_, _, e) (* Type declarations are ignored at runtime *)
-	| LetADT(_, _, _, e) -> eval' e s
+	| In(TypeSynonym(_, _), e) (* Type declarations are ignored at runtime *)
+	| In(LetADT(_, _, _), e) -> eval' e s
 	| Constructor n -> VConstructor n
 	| Match(e, lst) ->
 		let match_expr = eval' e s in
@@ -136,5 +137,6 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 					let s = List.fold_left foldf s lst in
 					eval' case_body s) in
 		eval_match lst
+	| Module _ -> failwith "Not implemented"
 
 let eval e = eval' e VarMap.empty

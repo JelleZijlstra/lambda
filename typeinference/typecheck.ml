@@ -63,6 +63,14 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| TADT(lst) ->
 		let mapf (_, t) = List.fold_left VariableSet.union VariableSet.empty (List.map free_variables t) in
 		List.fold_left VariableSet.union VariableSet.empty (List.map mapf lst)
+	| TModule lst ->
+		let foldf rest entry = match entry with
+			| AbstractType(n, _) -> VariableSet.remove n rest
+			| ConcreteType(n, params, t) ->
+				let t_vars = List.fold_left (fun x y -> VariableSet.remove y x) (free_variables t) params in
+				VariableSet.remove n (VariableSet.union t_vars rest)
+			| Value(n, t) -> VariableSet.union (free_variables t) rest in
+		List.fold_left foldf VariableSet.empty lst
 
 let free_variables_context (c : Context.t) =
 	Context.fold_vars (fun _ t a -> VariableSet.union (free_variables t) a) VariableSet.empty c
@@ -85,6 +93,16 @@ let rec replace_in_type typevar new_type t =
 	| TypeWithLabel(n, lst) ->
 		let mapf (l, t) = l, replace_in_type typevar new_type t in
 		TypeWithLabel(n, List.map mapf lst)
+	| TModule lst ->
+		let rec loop lst = match lst with
+			| [] -> []
+			| ((AbstractType(n, _)) | (ConcreteType(n, _, _)))::tl when n = typevar -> lst
+			| ConcreteType(_, params, _)::tl when List.mem typevar params -> lst
+			| ConcreteType(n, params, t)::tl ->
+				ConcreteType(n, params, replace_in_type typevar new_type t)::loop tl
+			| AbstractType(n, params)::tl -> AbstractType(n, params)::loop tl
+			| Value(n, t)::tl -> Value(n, replace_in_type typevar new_type t)::loop tl in
+		TModule(loop lst)
 
 let rec replace_in_kind (kv : string) (new_kind : kind) (k : kind) = match k with
 	| KVar x when kv = x -> new_kind
@@ -115,6 +133,10 @@ let print_substitution s =
 	let foldf x t rest = "\t" ^ x ^ " = " ^ string_of_type t ^ "\n" ^ rest in
 	VarMap.fold foldf s ""
 
+let print_ksubstitution s =
+	let foldf x t rest = "\t" ^ x ^ " = " ^ string_of_kind t ^ "\n" ^ rest in
+	VarMap.fold foldf s ""
+
 let set_map f s = ConstraintSet.fold (fun elt s -> ConstraintSet.add (f elt) s) s em
 
 let replace_type typevar new_type =
@@ -125,10 +147,10 @@ let replace_type typevar new_type =
 			HasLabel(replace_in_type typevar new_type t1, l, replace_in_type typevar new_type t2) in
 	set_map mapf
 
-let replace_kind kvar new_kind =
+let replace_kind kvar new_kind ks =
 	let mapf (KEquals(k1, k2)) =
 		KEquals(replace_in_kind kvar new_kind k1, replace_in_kind kvar new_kind k2) in
-	KindConstraintSet.fold (fun elt s -> KindConstraintSet.add (mapf elt) s) kem
+	KindConstraintSet.fold (fun elt s -> KindConstraintSet.add (mapf elt) s) ks kem
 
 let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| Typevar t' -> t = t'
@@ -142,6 +164,15 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| TForAll(lst, t') -> not (List.mem t lst) && is_free_variable t t'
 	| TADT(lst) -> List.exists (fun (_, t') -> List.exists (is_free_variable t) t') lst
 	| TypeWithLabel(n, lst) -> n = t || List.exists (fun (_, t') -> is_free_variable t t') lst
+	| TModule lst ->
+		let rec loop lst = match lst with
+			| [] -> false
+			| Value(n, t')::tl -> is_free_variable t t' || loop tl
+			| (ConcreteType(n, _, _) | AbstractType(n, _))::_ when n = t -> false
+			| ConcreteType(_, params, _)::_ when List.mem t params -> false
+			| ConcreteType(_, _, t')::tl -> is_free_variable t t' || loop tl
+			| AbstractType(_, _)::tl -> loop tl in
+		loop lst
 
 let rec is_free_kvar (t : string) (k : kind) = match k with
 	| KVar x -> t = x
@@ -264,6 +295,15 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 	| TParameterized(t1, t2) -> TParameterized(apply_substitution s t1 b, apply_substitution s t2 b)
 	| TypeWithLabel(name, lst) ->
 		TypeWithLabel(name, List.map (fun (l, t) -> l, apply_substitution s t b) lst)
+	| TModule lst ->
+		let rec loop lst b = match lst with
+			| [] -> []
+			| AbstractType(n, params)::tl -> AbstractType(n, params)::loop tl (VariableSet.add n b)
+			| ConcreteType(n, params, t)::tl ->
+				let new_b = VariableSet.add n b in
+				ConcreteType(n, params, apply_substitution s t new_b)::loop tl new_b
+			| Value(n, t)::tl -> Value(n, apply_substitution s t b)::loop tl b in
+		TModule(loop lst b)
 
 let rec get_kind (t : ltype) (c : Context.t) : kind * KindConstraintSet.t =
 	let add = KindConstraintSet.add in
@@ -315,6 +355,16 @@ let rec get_kind (t : ltype) (c : Context.t) : kind * KindConstraintSet.t =
 		let k2, kc2 = get_kind t2 c in
 		let result_k = Ast.new_kindvar() in
 		result_k, add (KEquals(k1, KArrow(k2, result_k))) (union kc1 kc2)
+	| TModule lst ->
+		failwith "Not implemented"
+(* 		let loop lst c = match lst with
+			| [] -> kem
+			| Value(n, t)::tl ->
+				let k, kc = get_kind t c in
+				let rest = loop tl in
+				add (KEquals(k, KStar)) (union kc rest)
+			| ConcreteType(n, lst, t)::tl ->
+ *)
 
 (* Handle an optional type (that may or may not be given) plus its kind *)
 let get_optional_type (t : ltype option) (ks : KindConstraintSet.t) (c : Context.t) : ltype * KindConstraintSet.t =
@@ -334,21 +384,18 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 	| Var x ->
 		(try Type(instantiate (Context.find_var x c), em, kem)
 			with Not_found -> raise (TypeError("Unbound variable: " ^ x)))
-	| Let(x, t, e1, e2) ->
+	| In(Let(x, t, e1), e2) ->
 		let Type(t1, cs1, ks1) = get_type e1 c in
 		let subst = unify cs1 in
-		Printf.printf "Initial type:\n\t%s\nContraints:\n%s\nSubstitution:\n%s" (string_of_type t1) (print_cs cs1) (print_substitution subst);
 		let t1' = apply_substitution subst t1 VariableSet.empty in
-		Printf.printf "Final type:\n\t%s\n" (string_of_type t1');
 		let t1'' = quantify c t1' in
-		Printf.printf "Final type (quantified):\n\t%s\n" (string_of_type t1'');
 		let new_tc = Context.add_var x t1'' c in
 		let Type(t2, cs2, ks2) = get_type e2 new_tc in
 		let ks = KindConstraintSet.union ks1 ks2 in
 		let t', ks' = get_optional_type t ks c in
 		let new_cs = ConstraintSet.add (Equals(t', t1'')) (ConstraintSet.union cs1 cs2) in
 		Type(t2, new_cs, ks')
-	| LetRec(x, t, e1, e2) ->
+	| In(LetRec(x, t, e1), e2) ->
 		let t', ks' = get_optional_type t kem c in
 		let e1_c = Context.add_var x t' c in
 		let Type(t1, cs1, ks1) = get_type e1 e1_c in
@@ -454,7 +501,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		Type(tv, new_cs, ks)
 	| Constructor n -> (try Type(instantiate (Context.find_var n c), em, kem)
 		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
-	| LetADT(name, params, lst, e) ->
+	| In(LetADT(name, params, lst), e) ->
 		let result_t = List.fold_left (fun r p -> TParameterized(r, Typevar p)) (Typevar name) params in
 		let foldf (k, tc) p =
 			let kv = Ast.new_kindvar() in
@@ -475,7 +522,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let _, kindc = new_tc in
 		let Type(t1, cs1, ks1) = get_type e (varc, kindc) in
 		Type(t1, cs1, KindConstraintSet.add (KEquals(KVar name, kind)) (KindConstraintSet.union new_ks ks1))
-	| TypeSynonym(name, t, e) ->
+	| In(TypeSynonym(name, t), e) ->
 		let kind, ks = get_kind t c in
 		let new_tc = Context.add_kind name kind c in
 		let Type(t1, cs1, ks1) = get_type e new_tc in
@@ -514,6 +561,11 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 			new_cs, new_ks in
 		let cs, ks = List.fold_left foldf (cs1, ks1) lst in
 		Type(res_tv, cs, ks)
+	| Module _ -> failwith "Not implemented"
+	| In(SingleExpression e1, e2) ->
+		let Type(t1, cs1, ks1) = get_type e1 c in
+		let Type(t2, cs2, ks2) = get_type e2 c in
+		Type(t2, ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
 
 let typecheck e verbose =
 	try let Type(t, cs, ks) = get_type e Context.empty in
@@ -521,10 +573,11 @@ let typecheck e verbose =
 			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
 				Printf.printf "Constraints:\n%s\n" (print_cs cs);
 				Printf.printf "Kind constraints:\n%s\n" (print_ks ks));
-			let _ = unify_kinds ks in
+			let subst' = unify_kinds ks in
 			let subst = unify cs in
 			if verbose then
 				let res_t = apply_substitution subst t VariableSet.empty in
+				Printf.printf "Kind substitution:\n%s" (print_ksubstitution subst');
 				Printf.printf "Substitution:\n%s" (print_substitution subst);
 				Printf.printf "Final type: %s\n" (string_of_type res_t)
 			else ignore subst;

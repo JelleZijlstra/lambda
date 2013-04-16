@@ -56,6 +56,15 @@ rule token = parse
 		{ MATCH }
 | "with"
 		{ WITH }
+| "module"
+		{ MODULE }
+| "interface"
+		{ INTERFACE }
+| "import"
+		{ IMPORT }
+| "open"
+		{ OPEN }
+| "end"	{ END }
 | "_"	{ UNDERSCORE }
 | ">"	{ GREATER }
 | "<"	{ LESS }

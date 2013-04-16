@@ -35,10 +35,10 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 	| Sequence(e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)
 	| Record lst -> Record(VarMap.map (fun e -> desugar e vm) lst)
 	| Member(e, l) -> Member(desugar e vm, l)
-	| Let(x, t, e1, e2) -> Application(Abstraction(x, t, desugar e2 vm), desugar e1 vm)
-	| LetRec(x, t, e1, e2) -> Application(Abstraction(x, t, desugar e2 vm), Fix(Abstraction(x, t, desugar e1 vm)))
-	| TypeSynonym(_, _, e) -> desugar e vm
-	| LetADT(_, _, lst, e) ->
+	| In(Let(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), desugar e1 vm)
+	| In(LetRec(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), Fix(Abstraction(x, t, desugar e1 vm)))
+	| In(TypeSynonym(_, _), e) -> desugar e vm
+	| In(LetADT(_, _, lst), e) ->
 		(* ADT constructors are converted into functions that return nested
 			pairs of values. For example, Cons would become
 					\hd. \tl. [["Cons", hd], tl])
@@ -53,6 +53,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 		in
 		let new_vm = List.fold_left foldf vm lst in
 		desugar e new_vm
+	| In(SingleExpression e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)
 	| Constructor x -> VarMap.find x vm
 	| Dummy _ -> failwith "Should not appear in code"
 	| Match(e, lst) ->
@@ -62,7 +63,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 			| PInt n -> If(Boolbinop(Equals, Int n, e), Injection(true, cont), Injection(false, Unit))
 			| PBool b -> If(Boolbinop(Equals, Bool b, e), Injection(true, cont), Injection(false, Unit))
 			| PAnything -> Injection(true, cont)
-			| PVariable x -> Injection(true, Let(x, None, e, cont))
+			| PVariable x -> Injection(true, In(Let(x, None, e), cont))
 			| PApplication(p1, p2)
 			| PPair(p1, p2) ->
 				(* case match (fst e) c of \_. inl () | \x. match (snd e) x *)
@@ -80,6 +81,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 		in
 		let mtch = List.fold_left foldf (Error "Inexhaustive pattern match") (List.rev lst) in
 		Application(Abstraction(x, None, mtch), desugar e vm)
+	| Module _ -> failwith "Not implemented"
 
 let desugar e = desugar e VarMap.empty
 
@@ -95,8 +97,6 @@ let rec compile_rec e = match e with
 	| Fix(Abstraction(arg, t, body)) ->
 		(* Apply the Z combinator *)
 		compile_rec(Application(z, Abstraction(arg, t, body)))
-	| Dummy _ | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
-	| Fix _ -> failwith "Impossible"
 	| If(e1, e2, e3) -> "((" ^ compile_rec e1 ^ ") ? (" ^ compile_rec e2 ^ ") : (" ^ compile_rec e3 ^ "))"
 	| Bool true -> "true"
 	| Bool false -> "false"
@@ -115,10 +115,12 @@ let rec compile_rec e = match e with
 		let foldf l e rest = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> "(" ^ compile_rec e ^ ")." ^ l
-	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
-	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| In(Let(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
+	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 	| Error e -> "((function() { throw new Error(\"" ^ e ^ "\"); })())"
 	| Constructor x -> "\"" ^ x ^ "\""
+	| Module _ -> failwith "Not implemented"
+	| Dummy _ | In _ | Fix _ | Match(_, _) -> failwith "Impossible"
 
 let compile e =
 	let e' = desugar e in
@@ -137,8 +139,6 @@ let rec compile_rec e = match e with
 	| Unop(Print, e) -> "(let e = " ^ compile_rec e ^ " in Printf.printf \"%d\\n\" e; e)"
 	| If(e1, e2, e3) -> "(if " ^ compile_rec e1 ^ " then " ^ compile_rec e2 ^ " else " ^ compile_rec e3 ^ ")"
 	| Fix(Abstraction(arg, t, body)) -> "(let rec " ^ translate_var arg ^ " = " ^ compile_rec body ^ " in " ^ translate_var arg ^ ")"
-	| Dummy _ | LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
-	| Fix _ -> failwith "Impossible"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(fst " ^ compile_rec e ^ ")"
 	| Projection(true, e) -> "(snd " ^ compile_rec e ^ ")"
@@ -150,10 +150,13 @@ let rec compile_rec e = match e with
 	| Sequence(e1, e2) -> "(ignore(" ^ compile_rec e1 ^ "); " ^ compile_rec e2 ^ ")"
 	| Record lst -> failwith "Not implemented"
 	| Member(e, l) -> failwith "Not implemented"
-	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
-	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| In(Let(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
+	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 	| Error e -> "(failwith \"" ^ e ^ "\")"
 	| Constructor x -> "\"" ^ x ^ "\""
+	| Module _ -> failwith "Not implemented"
+	| Dummy _ | In _ | Match(_, _)
+	| Fix _ -> failwith "Impossible"
 
 let compile_ml e = "let _ = Printf.printf \"%d\\n\" (" ^ compile_rec e ^ ");;"
 
@@ -180,8 +183,6 @@ let rec compile_rec e = match e with
 	| Fix(Abstraction(arg, _, body)) ->
 		"((func: ; private " ^ translate_var arg ^ " = " ^ compile_rec body ^ "; "
 			^ translate_var arg ^ "; end) ())"
-	| LetADT(_, _, _, _) | TypeSynonym(_, _, _) | Match(_, _)
-	| Fix _ | Dummy _ -> failwith "Impossible"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(" ^ compile_rec e ^ "->0)"
 	| Projection(true, e) -> "(" ^ compile_rec e ^ "->1)"
@@ -198,10 +199,12 @@ let rec compile_rec e = match e with
 		let foldf l e rest = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> "((" ^ compile_rec e ^ ")->'" ^ l ^ "')"
-	| Let(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
-	| LetRec(x, t, e1, e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| In(Let(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
+	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 	| Error e -> "(throw(Exception.new(\"" ^ e ^ "\")))"
 	| Constructor x -> "\"" ^ x ^ "\""
+	| Module _ -> failwith "Not implemented"
+	| In _ | Match(_, _) | Fix _ | Dummy _ -> failwith "Impossible"
 
 let compile_eh e =
 	let e' = desugar e in

@@ -5,7 +5,8 @@
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
-%token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA
+%token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
+%token INTERFACE IMPORT END
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
 %type<Ast.expr> single_expr
@@ -31,18 +32,7 @@ single_expr:
 								{ Abstraction($2, None, $4) }
 	| BACKSLASH IDENTIFIER COLON type DOT single_expr
 								{ Abstraction($2, Some $4, $6) }
-	| LET IDENTIFIER EQUALS expression IN single_expr
-								{ Let($2, None, $4, $6) }
-	| LET IDENTIFIER COLON type EQUALS expression IN single_expr
-								{ Let($2, Some $4, $6, $8) }
-	| LET REC IDENTIFIER EQUALS expression IN single_expr
-								{ LetRec($3, None, $5, $7) }
-	| LET REC IDENTIFIER COLON type EQUALS expression IN single_expr
-								{ LetRec($3, Some $5, $7, $9) }
-	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list IN single_expr
-								{ LetADT($2, $3, $5::$6, $8) }
-	| TYPE IDENTIFIER EQUALS type IN single_expr
-								{ TypeSynonym($2, $4, $6) }
+	| in_expr IN single_expr	{ In($1, $3) }
 	| FST single_expr			{ Projection(false, $2) }
 	| SND single_expr			{ Projection(true, $2) }
 	| IF expression THEN expression ELSE single_expr
@@ -60,6 +50,20 @@ single_expr:
 	| MATCH expression WITH LBRACE BAR pattern ARROW single_expr pattern_list RBRACE
 								{ Match($2, ($6, $8)::$9) }
 	| assign_expr				{ $1 }
+
+in_expr:
+	| LET IDENTIFIER EQUALS expression
+								{ Let($2, None, $4) }
+	| LET IDENTIFIER COLON type EQUALS expression
+								{ Let($2, Some $4, $6) }
+	| LET REC IDENTIFIER EQUALS expression
+								{ LetRec($3, None, $5) }
+	| LET REC IDENTIFIER COLON type EQUALS expression
+								{ LetRec($3, Some $5, $7) }
+	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
+								{ LetADT($2, $3, $5::$6) }
+	| TYPE IDENTIFIER EQUALS type
+								{ TypeSynonym($2, $4) }
 
 assign_expr:
 	equals_expr ASSIGN equals_expr
@@ -102,6 +106,10 @@ simple_expr:
 	| LPAREN RPAREN				{ Unit }
 	| LBRACE RBRACE				{ Record VarMap.empty }
 	| LBRACE record_list RBRACE	{ Record $2 }
+	| MODULE module_body END	{ Module(None, $2) }
+
+module_body:
+	| expression				{ [SingleExpression $1] }
 
 record_list:
 	| IDENTIFIER EQUALS expression
@@ -132,6 +140,23 @@ simple_type:
 	| BOOL						{ TBool }
 	| UNIT						{ TUnit }
 	| IDENTIFIER				{ Typevar $1 }
+	| INTERFACE LBRACE module_type_body RBRACE
+								{ TModule $3 }
+
+module_type_body:
+	| module_type_entry			{ [$1] }
+	| module_type_entry COMMA module_type_body
+								{ $1::$3 }
+
+module_type_entry:
+	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
+								{ ConcreteType($2, $3, TADT($5::$6)) }
+	| DATA IDENTIFIER parameter_list
+								{ AbstractType($2, $3) }
+	| TYPE IDENTIFIER			{ AbstractType($2, []) }
+	| TYPE IDENTIFIER EQUALS type
+								{ ConcreteType($2, [], $4) }
+	| IDENTIFIER COLON type		{ Value($1, $3) }
 
 record_type_list:
 	| IDENTIFIER COLON type		{ VarMap.singleton $1 $3 }

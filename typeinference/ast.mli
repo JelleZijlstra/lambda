@@ -27,17 +27,19 @@ type ltype =
 	| TForAll of string list * ltype
 	| TADT of adt
 	| TParameterized of ltype * ltype
+	| TModule of module_type_entry list
 and adt = adt_cons list
 and adt_cons = string * ltype list
+and module_type_entry =
+	| AbstractType of string * string list
+	| ConcreteType of string * string list * ltype
+	| Value of string * ltype
 
 type expr =
 	Var of string
 	| Abstraction of string * ltype option * expr
 	| Application of expr * expr
-	| Let of string * ltype option * expr * expr
-	| LetRec of string * ltype option * expr * expr
-	| LetADT of string * string list * adt * expr
-	| TypeSynonym of string * ltype * expr
+	| In of in_expr * expr
 	| Int of int
 	| Bool of bool
 	| Binop of binop * expr * expr
@@ -60,6 +62,7 @@ type expr =
 	| Match of expr * (pattern * expr) list
 	| Error of string
 	| Dummy of value
+	| Module of ltype option * in_expr list
 and pattern =
 	PAnything
 	| PVariable of string
@@ -81,6 +84,12 @@ and value =
 	| VInjection of bool * value
 	| VError of string
 	| VDummy of expr * value VarMap.t
+and in_expr =
+	| Let of string * ltype option * expr
+	| LetRec of string * ltype option * expr
+	| LetADT of string * string list * adt
+	| TypeSynonym of string * ltype
+	| SingleExpression of expr
 
 type kind =
 	| KStar
