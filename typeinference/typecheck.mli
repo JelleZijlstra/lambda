@@ -1,3 +1,5 @@
 type errmsg = string
 
-val typecheck : Ast.expr -> bool -> errmsg option
+type typecheck_t = TError of errmsg | Result of Ast.expr
+
+val typecheck : Ast.expr -> bool -> typecheck_t

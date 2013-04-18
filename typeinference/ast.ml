@@ -87,12 +87,15 @@ and value =
 	| VInjection of bool * value
 	| VError of string
 	| VDummy of expr * value VarMap.t
+	| VModule of module_type_entry list * value VarMap.t
 and in_expr =
 	| Let of string * ltype option * expr
 	| LetRec of string * ltype option * expr
 	| LetADT of string * string list * adt
 	| TypeSynonym of string * ltype
 	| SingleExpression of expr
+	| Open of string
+	| Import of string
 
 type kind =
 	| KStar
@@ -128,11 +131,11 @@ let rec string_of_type t = match t with
 	| TADT(lst) -> join " | " (List.map (fun (name, args) -> name ^ " " ^ join " " (List.map string_of_type args)) lst)
 	| TParameterized(t1, t2) -> string_of_type t1 ^ " " ^ string_of_type t2
 	| TModule(ts) ->
-		let mapf entry = match entry with
-			| AbstractType(n, ps) -> "type " ^ n ^ ljoin " " ps
-			| ConcreteType(n, ps, t) -> "type " ^ n ^ ljoin " " ps ^ " = " ^ string_of_type t
-			| Value(n, t) -> n ^ " : " ^ string_of_type t in
-		join ", " (List.map mapf ts)
+		"{" ^ join ", " (List.map string_of_module_type_entry ts) ^ "}"
+and string_of_module_type_entry entry = match entry with
+	| AbstractType(n, ps) -> "type " ^ n ^ ljoin " " ps
+	| ConcreteType(n, ps, t) -> "type " ^ n ^ ljoin " " ps ^ " = " ^ string_of_type t
+	| Value(n, t) -> n ^ " : " ^ string_of_type t
 
 let f_of_binop op = match op with
 	| Plus -> (+)
@@ -216,6 +219,8 @@ and string_of_in_expr e = match e with
 		"type " ^ s ^ params_str ^ " = " ^ string_of_type (TADT adt)
 	| TypeSynonym(n, t) -> "type " ^ n ^ " = " ^ string_of_type t
 	| SingleExpression e -> string_of_expr e
+	| Open m -> "open " ^ m
+	| Import m -> "import " ^ m
 
 and string_of_pattern p = match p with
 	| PAnything -> "_"
@@ -245,6 +250,9 @@ and string_of_value e =
 	| VDummy(e, _) -> string_of_expr e
 	| VADTInstance(v1, v2) -> "(" ^ string_of_value v1 ^ " " ^ string_of_value v2 ^ ")"
 	| VError e -> "#error " ^ e
+	| VModule(t, lst) ->
+		let foldf k v rest = "\tlet " ^ k ^ " = " ^ string_of_value v ^ "\n" ^ rest in
+		"module\n" ^ VarMap.fold foldf lst "" ^ "end"
 
 let rec string_of_kind k = match k with
 	| KStar -> "*"
@@ -274,3 +282,5 @@ let next_id =
 		current := n + 1;
 		string_of_int n
 ;;
+
+let qualify_name name = name ^ "/" ^ next_id ();;

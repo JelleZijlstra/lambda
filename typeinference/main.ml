@@ -18,8 +18,8 @@ let main () =
 	Arg.parse arguments (fun str -> file := str) "Implementation of the untyped lambda calculus";
 
 	let com = Util.parse_file (!file) in
-	match if !do_no_typecheck then None else Typecheck.typecheck com (!do_verbose) with
-	| None ->
+	match if !do_no_typecheck then Typecheck.Result com else Typecheck.typecheck com (!do_verbose) with
+	| Typecheck.Result com ->
 		if !do_compile
 		then let result = Compile.compile com in
 			Printf.printf "%s\n" result
@@ -31,7 +31,7 @@ let main () =
 			Printf.printf "%s\n" result
 		else let result = Eval.eval com in
 			Printf.printf "Result: %s\n" (Ast.string_of_value result)
-	| Some error ->
+	| Typecheck.TError error ->
 		Printf.printf "Error: %s\n" error; exit 1
 ;;
 

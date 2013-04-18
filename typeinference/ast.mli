@@ -84,12 +84,15 @@ and value =
 	| VInjection of bool * value
 	| VError of string
 	| VDummy of expr * value VarMap.t
+	| VModule of module_type_entry list * value VarMap.t
 and in_expr =
 	| Let of string * ltype option * expr
 	| LetRec of string * ltype option * expr
 	| LetADT of string * string list * adt
 	| TypeSynonym of string * ltype
 	| SingleExpression of expr
+	| Open of string
+	| Import of string
 
 type kind =
 	| KStar
@@ -97,6 +100,8 @@ type kind =
 	| KVar of string
 
 val string_of_type : ltype -> string
+
+val string_of_module_type_entry : module_type_entry -> string
 
 val f_of_binop : binop -> int -> int -> int
 
@@ -112,6 +117,8 @@ val string_of_unop : unop -> string
 
 val string_of_expr : expr -> string
 
+val string_of_in_expr : in_expr -> string
+
 val string_of_value : value -> string
 
 val string_of_kind: kind -> string
@@ -121,3 +128,5 @@ val new_typevar : unit -> ltype
 val new_kindvar : unit -> kind
 
 val next_id : unit -> string
+
+val qualify_name : string -> string

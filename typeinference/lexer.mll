@@ -65,6 +65,7 @@ rule token = parse
 | "open"
 		{ OPEN }
 | "end"	{ END }
+| ";;"	{ DOUBLESEMICOLON }
 | "_"	{ UNDERSCORE }
 | ">"	{ GREATER }
 | "<"	{ LESS }

@@ -1,0 +1,4 @@
+type mod = interface {
+	type t, data foo b = A | B b, bar : int
+} in
+42

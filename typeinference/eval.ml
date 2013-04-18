@@ -137,6 +137,30 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 					let s = List.fold_left foldf s lst in
 					eval' case_body s) in
 		eval_match lst
-	| Module _ -> failwith "Not implemented"
+	| In(Open m, e) -> eval' e (do_open m s)
+	| Module(Some(TModule t), lst) ->
+		let rec loop lst s = match lst with
+			| [] -> VarMap.empty
+			| Let(x, _, e)::tl ->
+				let f = VarMap.add x (eval' e s) in
+				f (loop tl (f s))
+			| LetRec(x, t, e)::tl ->
+				let v = eval' (Fix(Abstraction(x, t, e))) s in
+				let f = VarMap.add x v in
+				f (loop tl (f s))
+			| SingleExpression e::tl ->
+				let f = VarMap.add "__result__" (eval' e s) in
+				f (loop tl s)
+			| Open m::tl ->
+				let s' = do_open m s in
+				loop tl s'
+			| (LetADT(_, _, _) | TypeSynonym(_, _) | Import _)::tl -> loop tl s
+		in
+		VModule(t, loop lst s)
+	| Module(_, _) | In(Import _, _) -> failwith "impossible"
+and do_open m s = match VarMap.find m s with
+	| VModule(t, lst) ->
+		VarMap.fold VarMap.add lst s
+	| _ -> failwith "Invalid open"
 
 let eval e = eval' e VarMap.empty

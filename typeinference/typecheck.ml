@@ -1,10 +1,12 @@
 open Ast
 
+type errmsg = string
+
+type typecheck_t = TError of errmsg | Result of Ast.expr
+
 type lconstraint = Equals of ltype * ltype | HasLabel of ltype * string * ltype
 
 type kconstraint = KEquals of kind * kind
-
-type errmsg = string
 
 module ConstraintSet = Set.Make(struct
 	type t = lconstraint
@@ -44,7 +46,7 @@ let kem = KindConstraintSet.empty
 
 exception TypeError of string
 
-type type_cs = Type of ltype * ConstraintSet.t * KindConstraintSet.t
+type type_cs = Type of ltype * expr * ConstraintSet.t * KindConstraintSet.t
 
 let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| Typevar t' -> VariableSet.singleton t'
@@ -64,13 +66,13 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 		let mapf (_, t) = List.fold_left VariableSet.union VariableSet.empty (List.map free_variables t) in
 		List.fold_left VariableSet.union VariableSet.empty (List.map mapf lst)
 	| TModule lst ->
-		let foldf rest entry = match entry with
+		let foldf entry rest = match entry with
 			| AbstractType(n, _) -> VariableSet.remove n rest
 			| ConcreteType(n, params, t) ->
 				let t_vars = List.fold_left (fun x y -> VariableSet.remove y x) (free_variables t) params in
 				VariableSet.remove n (VariableSet.union t_vars rest)
 			| Value(n, t) -> VariableSet.union (free_variables t) rest in
-		List.fold_left foldf VariableSet.empty lst
+		List.fold_right foldf lst VariableSet.empty
 
 let free_variables_context (c : Context.t) =
 	Context.fold_vars (fun _ t a -> VariableSet.union (free_variables t) a) VariableSet.empty c
@@ -356,15 +358,47 @@ let rec get_kind (t : ltype) (c : Context.t) : kind * KindConstraintSet.t =
 		let result_k = Ast.new_kindvar() in
 		result_k, add (KEquals(k1, KArrow(k2, result_k))) (union kc1 kc2)
 	| TModule lst ->
-		failwith "Not implemented"
-(* 		let loop lst c = match lst with
+ 		let rec loop lst c = match lst with
 			| [] -> kem
 			| Value(n, t)::tl ->
 				let k, kc = get_kind t c in
-				let rest = loop tl in
+				let rest = loop tl c in
 				add (KEquals(k, KStar)) (union kc rest)
-			| ConcreteType(n, lst, t)::tl ->
- *)
+			| ConcreteType(n, lst, TADT t)::tl ->
+				let kc, c' = type_adt n lst t c in
+				let rest = loop tl c' in
+				union kc rest
+			| ConcreteType(_, _, _)::_ ->
+				raise(TypeError("Concrete module type must be ADT for now"))
+			| AbstractType(n, lst)::tl ->
+				let k = List.fold_left (fun rest _ -> KArrow(KStar, rest)) KStar lst in
+				let c' = Context.add_kind n k c in
+				loop tl c' in
+		KStar, loop lst c
+
+and type_adt (name : string) (params : string list) (lst : adt) (c : Context.t) : KindConstraintSet.t * Context.t =
+	let qualified_name = qualify_name name in
+	let result_t = List.fold_left (fun r p -> TParameterized(r, Typevar p)) (Typevar qualified_name) params in
+	let foldf (k, tc) p =
+		let kv = KVar(qualify_name p) in
+		(KArrow(kv, k), Context.add_kind p kv tc) in
+	let kind, tc = List.fold_left foldf (KStar, c) params in
+	let new_tc = Context.add_kind name kind tc in
+	let foldf (rest, ks) (name, lst) =
+		let inner_foldf (rest, ks) t =
+			let k, ks' = get_kind t new_tc in
+			let new_ks = KindConstraintSet.add (KEquals(k, KStar)) (KindConstraintSet.union ks ks') in
+			TFunction(t, rest), new_ks in
+		let t, ks = List.fold_left inner_foldf (result_t, ks) lst in
+		let t = if params = [] then t else TForAll(params, t) in
+		Context.add_var name t rest, ks in
+	let tc', new_ks = List.fold_left foldf (tc, kem) lst in
+	(* Include variables from the ADT definition in the new context, but not kind bindings *)
+	let varc, _ = tc' in
+	let _, kindc = new_tc in
+	let new_ks = KindConstraintSet.add (KEquals(KVar qualified_name, kind)) new_ks in
+	(new_ks, (varc, kindc))
+
 
 (* Handle an optional type (that may or may not be given) plus its kind *)
 let get_optional_type (t : ltype option) (ks : KindConstraintSet.t) (c : Context.t) : ltype * KindConstraintSet.t =
@@ -376,94 +410,118 @@ let get_optional_type (t : ltype option) (ks : KindConstraintSet.t) (c : Context
 			(KindConstraintSet.union ks ks') in
 		t', new_ks
 
+let check_module_type (interface : module_type_entry list) (actual : module_type_entry list) =
+	(* First, create two maps from the actual type, to enable easy lookup
+		while looping over the interface. *)
+	let foldf (tmap, vmap) entry = match entry with
+		| ConcreteType(n, _, _) | AbstractType(n, _) ->
+			(VarMap.add n entry tmap, vmap)
+		| Value(x, _) ->
+			(tmap, VarMap.add x entry vmap) in
+	let tmap, vmap = List.fold_left foldf (VarMap.empty, VarMap.empty) actual in
+
+	let check_foldf (t, cs) entry = try
+		match entry with
+		| ConcreteType(n, params, tp) -> (match VarMap.find n tmap with
+			| ConcreteType(n', params', tp') when n = n' && params = params' && tp = tp' ->
+				(entry::t, cs)
+			| ConcreteType(_, _, _) as e ->
+				let msg = "Interface and implementation do not match: " ^ string_of_module_type_entry entry ^ " and " ^ string_of_module_type_entry e in
+				raise(TypeError msg)
+			| _ -> failwith "impossible")
+		| AbstractType(n, params) -> (match VarMap.find n tmap with
+			| ConcreteType(n', params', _) when n = n' && params = params' ->
+				(entry::t, cs)
+			| ConcreteType(_, _, _) as e ->
+				let msg = "Interface and implementation do not match: " ^ string_of_module_type_entry entry ^ " and " ^ string_of_module_type_entry e in
+				raise(TypeError msg)
+			| _ -> failwith "impossible")
+		| Value(x, tp) -> (match VarMap.find x vmap with
+			| Value(x', tp') when x = x' ->
+				(entry::t, ConstraintSet.add (Equals(tp, tp')) cs)
+			| _ -> failwith "Impossible")
+	with Not_found ->
+		let text = string_of_module_type_entry entry in
+		let msg = "Module types do not match, cannot find interface member " ^ text ^ " in implementation" in
+		raise(TypeError msg)
+	in
+	List.fold_left check_foldf ([], em) interface
+
 let rec get_type (e : expr) (c : Context.t) : type_cs =
 	match e with
-	| Int _ -> Type(TInt, em, kem)
-	| Bool _ -> Type(TBool, em, kem)
-	| Unit -> Type(TUnit, em, kem)
+	| Int _ -> Type(TInt, e, em, kem)
+	| Bool _ -> Type(TBool, e, em, kem)
+	| Unit -> Type(TUnit, e, em, kem)
 	| Var x ->
-		(try Type(instantiate (Context.find_var x c), em, kem)
+		(try Type(instantiate (Context.find_var x c), e, em, kem)
 			with Not_found -> raise (TypeError("Unbound variable: " ^ x)))
 	| In(Let(x, t, e1), e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let subst = unify cs1 in
-		let t1' = apply_substitution subst t1 VariableSet.empty in
-		let t1'' = quantify c t1' in
-		let new_tc = Context.add_var x t1'' c in
-		let Type(t2, cs2, ks2) = get_type e2 new_tc in
-		let ks = KindConstraintSet.union ks1 ks2 in
-		let t', ks' = get_optional_type t ks c in
-		let new_cs = ConstraintSet.add (Equals(t', t1'')) (ConstraintSet.union cs1 cs2) in
-		Type(t2, new_cs, ks')
+		let tc, t', e1', cs1, ks1 = get_type_let e1 x t c in
+		let Type(t2, e2', cs2, ks2) = get_type e2 tc in
+		Type(t2, In(Let(x, Some t', e1'), e2'), ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
 	| In(LetRec(x, t, e1), e2) ->
-		let t', ks' = get_optional_type t kem c in
-		let e1_c = Context.add_var x t' c in
-		let Type(t1, cs1, ks1) = get_type e1 e1_c in
-		let subst = unify cs1 in
-		let t1' = apply_substitution subst t1 VariableSet.empty in
-		let t1'' = quantify e1_c t1' in
-		let new_tc = Context.add_var x t1'' c in
-		let Type(t2, cs2, ks2) = get_type e2 new_tc in
-		let ks = KindConstraintSet.union ks' (KindConstraintSet.union ks1 ks2) in
-		let new_cs = ConstraintSet.add (Equals(t', t1')) (ConstraintSet.union cs1 cs2) in
-		Type(t2, new_cs, ks)
-	| Binop(_, e1, e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
-		Type(TInt, ConstraintSet.add (Equals(t1, TInt))
+		let tc, t', e1', cs1, ks1 = get_type_let_rec e1 x t c in
+		let Type(t2, e2', cs2, ks2) = get_type e2 tc in
+		Type(t2, In(LetRec(x, Some t', e1'), e2'), ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
+	| Binop(op, e1, e2) ->
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
+		Type(TInt, Binop(op, e1, e2),
+			ConstraintSet.add (Equals(t1, TInt))
 			(ConstraintSet.add (Equals(t2, TInt))
 				(ConstraintSet.union cs1 cs2)), KindConstraintSet.union ks1 ks2)
-	| Boolbinop(_, e1, e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
-		Type(TBool, ConstraintSet.add (Equals(t1, TInt))
+	| Boolbinop(op, e1, e2) ->
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
+		Type(TBool, Boolbinop(op, e1, e2),
+			ConstraintSet.add (Equals(t1, TInt))
 			(ConstraintSet.add (Equals(t2, TInt))
 				(ConstraintSet.union cs1 cs2)), KindConstraintSet.union ks1 ks2)
-	| Unop(_, e) ->
-		let Type(t, cs, ks) = get_type e c in
-		Type(TInt, ConstraintSet.add (Equals(t, TInt)) cs, ks)
+	| Unop(op, e) ->
+		let Type(t, e, cs, ks) = get_type e c in
+		Type(TInt, Unop(op, e), ConstraintSet.add (Equals(t, TInt)) cs, ks)
 	| Application(e1, e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
 		let new_type = Ast.new_typevar() in
 		let new_cs = ConstraintSet.add (Equals(t1, TFunction(t2, new_type))) (ConstraintSet.union cs1 cs2) in
-		Type(new_type, new_cs, KindConstraintSet.union ks1 ks2)
+		Type(new_type, Application(e1, e2), new_cs, KindConstraintSet.union ks1 ks2)
 	| Abstraction(arg, t, body) ->
 		let t', ks' = get_optional_type t kem c in
-		let Type(t'', cs, ks) = get_type body (Context.add_var arg t' c) in
-		Type(TFunction(t', t''), cs, KindConstraintSet.union ks ks')
+		let Type(t'', body, cs, ks) = get_type body (Context.add_var arg t' c) in
+		Type(TFunction(t', t''), Abstraction(arg, Some t', body), cs, KindConstraintSet.union ks ks')
 	| Fix e ->
-		let Type(t, cs, ks) = get_type e c in
+		let Type(t, e, cs, ks) = get_type e c in
 		let new_type = Ast.new_typevar() in
 		let new_cs = ConstraintSet.add (Equals(t, TFunction(new_type, new_type))) cs in
-		Type(new_type, new_cs, ks)
+		Type(new_type, Fix e, new_cs, ks)
 	| If(e1, e2, e3) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
-		let Type(t3, cs3, ks3) = get_type e3 c in
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
+		let Type(t3, e3, cs3, ks3) = get_type e3 c in
 		let new_cs = ConstraintSet.union cs1 (ConstraintSet.union cs2 cs3) in
 		let new_cs = ConstraintSet.add (Equals(t1, TBool)) (ConstraintSet.add (Equals(t2, t3)) new_cs) in
-		Type(t2, new_cs, KindConstraintSet.union ks1 (KindConstraintSet.union ks2 ks3))
+		Type(t2, If(e1, e2, e3), new_cs, KindConstraintSet.union ks1 (KindConstraintSet.union ks2 ks3))
 	| Pair(e1, e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
-		Type(TProduct(t1, t2), ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
+		Type(TProduct(t1, t2), Pair(e1, e2), ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
 	| Projection(b, e) ->
-		let Type(t, cs, ks) = get_type e c in
+		let Type(t, e, cs, ks) = get_type e c in
 		let left_typevar = Ast.new_typevar() in
 		let right_typevar = Ast.new_typevar() in
 		let new_constraint = Equals(t, TProduct(left_typevar, right_typevar)) in
 		let my_type = if b then right_typevar else left_typevar in
-		Type(my_type, ConstraintSet.add new_constraint cs, ks)
+		Type(my_type, Projection(b, e), ConstraintSet.add new_constraint cs, ks)
 	| Injection(b, e) ->
-		let Type(t, cs, ks) = get_type e c in
+		let Type(t, e, cs, ks) = get_type e c in
 		let other_typevar = Ast.new_typevar() in
 		let my_type = if b then TSum(other_typevar, t) else TSum(t, other_typevar) in
-		Type(my_type, cs, ks)
+		Type(my_type, Injection(b, e), cs, ks)
 	| Case(e1, e2, e3) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
-		let Type(t3, cs3, ks3) = get_type e3 c in
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
+		let Type(t3, e3, cs3, ks3) = get_type e3 c in
 		let tv2a = Ast.new_typevar() in
 		let tv3a = Ast.new_typevar() in
 		let tv_res = Ast.new_typevar() in
@@ -471,105 +529,177 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let with_sum = ConstraintSet.add (Equals(t1, TSum(tv2a, tv3a))) new_cs in
 		let with_left = ConstraintSet.add (Equals(t2, TFunction(tv2a, tv_res))) with_sum in
 		let with_right = ConstraintSet.add (Equals(t3, TFunction(tv3a, tv_res))) with_left in
-		Type(tv_res, with_right, KindConstraintSet.union ks1 (KindConstraintSet.union ks2 ks3))
+		Type(tv_res, Case(e1, e2, e3), with_right, KindConstraintSet.union ks1 (KindConstraintSet.union ks2 ks3))
 	| Allocation(e) ->
-		let Type(t, cs, ks) = get_type e c in Type(TRef t, cs, ks)
+		let Type(t, e, cs, ks) = get_type e c in Type(TRef t, Allocation e, cs, ks)
 	| Dereference(e) ->
-		let Type(t, cs, ks) = get_type e c in
+		let Type(t, e, cs, ks) = get_type e c in
 		let tv = Ast.new_typevar() in
 		let new_cs = ConstraintSet.add (Equals(t, TRef tv)) cs in
-		Type(tv, new_cs, ks)
+		Type(tv, Dereference e, new_cs, ks)
 	| Assignment(e1, e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
 		let new_cs = ConstraintSet.add (Equals(t1, TRef t2)) (ConstraintSet.union cs1 cs2) in
-		Type(TUnit, new_cs, KindConstraintSet.union ks1 ks2)
+		Type(TUnit, Assignment(e1, e2), new_cs, KindConstraintSet.union ks1 ks2)
 	| Sequence(e1, e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
-		Type(t2, ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
+		Type(t2, Sequence(e1, e2), ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
  	| Record lst ->
-		let foldf l e (rest, cs, ks) =
-			let Type(t, cs', ks') = get_type e c in
-			VarMap.add l t rest, ConstraintSet.union cs cs', KindConstraintSet.union ks ks' in
-		let t, cs, ks = VarMap.fold foldf lst (VarMap.empty, em, kem) in
-		Type(TRecord t, cs, ks)
+		let foldf l e (rest, record_e, cs, ks) =
+			let Type(t, e, cs', ks') = get_type e c in
+			VarMap.add l t rest, VarMap.add l e record_e, ConstraintSet.union cs cs', KindConstraintSet.union ks ks' in
+		let t, lst, cs, ks = VarMap.fold foldf lst (VarMap.empty, VarMap.empty, em, kem) in
+		Type(TRecord t, Record lst, cs, ks)
 	| Member(e, l) ->
-		let Type(t, cs, ks) = get_type e c in
+		let Type(t, e, cs, ks) = get_type e c in
 		let tv = Ast.new_typevar() in
 		let new_cs = ConstraintSet.add (HasLabel(t, l, tv)) cs in
-		Type(tv, new_cs, ks)
-	| Constructor n -> (try Type(instantiate (Context.find_var n c), em, kem)
+		Type(tv, Member(e, l), new_cs, ks)
+	| Constructor n -> (try Type(instantiate (Context.find_var n c), e, em, kem)
 		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
 	| In(LetADT(name, params, lst), e) ->
-		let qualified_name = name ^ "/" ^ next_id() in
-		let result_t = List.fold_left (fun r p -> TParameterized(r, Typevar p)) (Typevar qualified_name) params in
-		let foldf (k, tc) p =
-			let kv = Ast.new_kindvar() in
-			(KArrow(kv, k), Context.add_kind p kv tc) in
-		let kind, tc = List.fold_left foldf (KStar, c) params in
-		let new_tc = Context.add_kind name kind tc in
-		let foldf (rest, ks) (name, lst) =
-			let inner_foldf (rest, ks) t =
-				let k, ks' = get_kind t new_tc in
-				let new_ks = KindConstraintSet.add (KEquals(k, KStar)) (KindConstraintSet.union ks ks') in
-				TFunction(t, rest), new_ks in
-			let t, ks = List.fold_left inner_foldf (result_t, ks) lst in
-			let t = if params = [] then t else TForAll(params, t) in
-			Context.add_var name t rest, ks in
-		let tc', new_ks = List.fold_left foldf (tc, kem) lst in
-		(* Include variables from the ADT definition in the new context, but not kind bindings *)
-		let varc, _ = tc' in
-		let _, kindc = new_tc in
-		let Type(t1, cs1, ks1) = get_type e (varc, kindc) in
-		Type(t1, cs1, KindConstraintSet.add (KEquals(KVar(qualified_name), kind)) (KindConstraintSet.union new_ks ks1))
+		let new_ks, c' = type_adt name params lst c in
+		let Type(t1, e1, cs1, ks1) = get_type e c' in
+		Type(t1, In(LetADT(name, params, lst), e1), cs1, KindConstraintSet.union new_ks ks1)
 	| In(TypeSynonym(name, t), e) ->
 		let kind, ks = get_kind t c in
 		let new_tc = Context.add_kind name kind c in
-		let Type(t1, cs1, ks1) = get_type e new_tc in
-		Type(t1, cs1, KindConstraintSet.union ks ks1)
+		let Type(t1, e1, cs1, ks1) = get_type e new_tc in
+		Type(t1, In(TypeSynonym(name, t), e), cs1, KindConstraintSet.union ks ks1)
 	| Dummy _ | Error _ -> raise(TypeError("Should not appear here"))
 	| Match(e, lst) ->
-		let Type(t1, cs1, ks1) = get_type e c in
+		let Type(t1, e1, cs1, ks1) = get_type e c in
 		let res_tv = Ast.new_typevar() in
-		let foldf (cs, ks) (p, e) =
+		let foldf (p, e) (lst, cs, ks) =
 			let rec type_pattern p t cs = match p with
-			| PAnything -> ([], cs)
-			| PVariable x -> ([(x, t)], cs)
-			| PInt _ -> ([], ConstraintSet.add (Equals(t, TInt)) cs)
-			| PBool _ -> ([], ConstraintSet.add (Equals(t, TBool)) cs)
-			| PPair(p1, p2) ->
-				let t1 = Ast.new_typevar() in
-				let t2 = Ast.new_typevar() in
-				let vars1, cs1 = type_pattern p1 t1 cs in
-				let vars2, cs2 = type_pattern p2 t2 cs1 in
-				(vars1 @ vars2, ConstraintSet.add (Equals(t, TProduct(t1, t2))) cs2)
-			| PConstructor x ->
-				let xt = (try instantiate (Context.find_var x c)
-					with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
-				([], ConstraintSet.add (Equals(xt, t)) cs)
-			| PApplication(p1, p2) ->
-				let t1 = Ast.new_typevar() in
-				let t2 = Ast.new_typevar() in
-				let vars1, cs1 = type_pattern p1 t1 cs in
-				let vars2, cs2 = type_pattern p2 t2 cs1 in
-				(vars1 @ vars2, ConstraintSet.add (Equals(t1, TFunction(t2, t))) cs2) in
-			let vars, cs = type_pattern p t1 cs in
+				| PAnything -> (p, [], cs)
+				| PVariable x -> (p, [(x, t)], cs)
+				| PInt _ -> (p, [], ConstraintSet.add (Equals(t, TInt)) cs)
+				| PBool _ -> (p, [], ConstraintSet.add (Equals(t, TBool)) cs)
+				| PPair(p1, p2) ->
+					let t1 = Ast.new_typevar() in
+					let t2 = Ast.new_typevar() in
+					let p1, vars1, cs1 = type_pattern p1 t1 cs in
+					let p2, vars2, cs2 = type_pattern p2 t2 cs1 in
+					(PPair(p1, p2), vars1 @ vars2, ConstraintSet.add (Equals(t, TProduct(t1, t2))) cs2)
+				| PConstructor x ->
+					let xt = (try instantiate (Context.find_var x c)
+						with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
+					(p, [], ConstraintSet.add (Equals(xt, t)) cs)
+				| PApplication(p1, p2) ->
+					let t1 = Ast.new_typevar() in
+					let t2 = Ast.new_typevar() in
+					let p1, vars1, cs1 = type_pattern p1 t1 cs in
+					let p2, vars2, cs2 = type_pattern p2 t2 cs1 in
+					(PApplication(p1, p2), vars1 @ vars2, ConstraintSet.add (Equals(t1, TFunction(t2, t))) cs2) in
+			let p, vars, cs = type_pattern p t1 cs in
 			let new_tc = List.fold_left (fun rest (x, t) -> Context.add_var x t rest) c vars in
-			let Type(t', cs', ks') = get_type e new_tc in
+			let Type(t', e, cs', ks') = get_type e new_tc in
 			let new_cs = ConstraintSet.add (Equals(res_tv, t')) (ConstraintSet.union cs cs') in
 			let new_ks = KindConstraintSet.union ks ks' in
-			new_cs, new_ks in
-		let cs, ks = List.fold_left foldf (cs1, ks1) lst in
-		Type(res_tv, cs, ks)
-	| Module _ -> failwith "Not implemented"
+			(p, e)::lst, new_cs, new_ks in
+		let lst, cs, ks = List.fold_right foldf lst ([], cs1, ks1) in
+		Type(res_tv, Match(e1, lst), cs, ks)
+	| Module(t, lst) ->
+		let rec loop lst c = match lst with
+			| [] -> [], [], em, kem
+			| (TypeSynonym(name, t) as hd)::tl ->
+				let kind, ks' = get_kind t c in
+				let new_tc = Context.add_kind name kind c in
+				let rest, m, cs, ks = loop tl new_tc in
+				ConcreteType(name, [], t)::rest, hd::m, cs, (KindConstraintSet.union ks ks')
+			| (LetADT(name, params, lst) as hd)::tl ->
+				let new_ks, c' = type_adt name params lst c in
+				let rest, m, cs, ks = loop tl c' in
+				ConcreteType(name, params, TADT lst)::rest, hd::m, cs, (KindConstraintSet.union ks new_ks)
+			| Let(x, t, e)::tl ->
+				let tc, t, e, cs, ks = get_type_let e x t c in
+				let rest, m, cs', ks' = loop tl tc in
+				Value(x, t)::rest, Let(x, Some t, e)::m, ConstraintSet.union cs cs', KindConstraintSet.union ks ks'
+			| LetRec(x, t, e)::tl ->
+				let tc, t, e, cs, ks = get_type_let_rec e x t c in
+				let rest, m, cs', ks' = loop tl tc in
+				Value(x, t)::rest, LetRec(x, Some t, e)::m, ConstraintSet.union cs cs', KindConstraintSet.union ks ks'
+			| SingleExpression e::tl ->
+				let Type(_, e, cs1, ks1) = get_type e c in
+				let rest, m, cs2, ks2 = loop tl c in
+				rest, SingleExpression e::m, ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2
+			| Open m::tl ->
+				let rest, m', cs, ks = loop tl (get_type_open m c) in
+				rest, Open m::m', cs, ks
+			| Import m::tl ->
+				let l, tc, cs, ks = get_type_import m c in
+				let rest, m', cs', ks' = loop tl tc in
+				rest, l::m', ConstraintSet.union cs cs', KindConstraintSet.union ks ks'
+		in
+		let lst, m, ks, cs = loop lst c in
+		(match t with
+			| None -> Type(TModule lst, Module(Some(TModule lst), m), ks, cs)
+			| Some(TModule lst') ->
+				let _ = check_module_type lst' lst in
+				Type(TModule lst', Module(t, m), ks, cs)
+			| Some _ -> raise(TypeError("Illegal module type")))
 	| In(SingleExpression e1, e2) ->
-		let Type(t1, cs1, ks1) = get_type e1 c in
-		let Type(t2, cs2, ks2) = get_type e2 c in
-		Type(t2, ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
+		let Type(t1, e1, cs1, ks1) = get_type e1 c in
+		let Type(t2, e2, cs2, ks2) = get_type e2 c in
+		Type(t2, Sequence(e1, e2), ConstraintSet.union cs1 cs2, KindConstraintSet.union ks1 ks2)
+	| In(Open m, e) ->
+		let c' = get_type_open m c in
+		let Type(t, e, cs, ks) = get_type e c' in
+		Type(t, In(Open m, e), cs, ks)
+	| In(Import m, e) ->
+		let l, tc, cs, ks = get_type_import m c in
+		let Type(t1, e1, cs1, ks1) = get_type e tc in
+		Type(t1, In(l, e1), ConstraintSet.union cs cs1, KindConstraintSet.union ks ks1)
+
+and get_type_let (e : expr) (x : string) (t : ltype option) (c : Context.t) : Context.t * ltype * expr * ConstraintSet.t * KindConstraintSet.t =
+	let Type(t1, e1, cs1, ks1) = get_type e c in
+	let subst = unify cs1 in
+	let t1' = apply_substitution subst t1 VariableSet.empty in
+	let t1'' = quantify c t1' in
+	let new_tc = Context.add_var x t1'' c in
+	let t', ks' = get_optional_type t ks1 c in
+	let new_cs = ConstraintSet.add (Equals(t', t1'')) cs1 in
+	new_tc, t1'', e1, new_cs, ks'
+and get_type_let_rec (e : expr) (x : string) (t : ltype option) (c : Context.t) : Context.t * ltype * expr * ConstraintSet.t * KindConstraintSet.t =
+	let t', ks' = get_optional_type t kem c in
+	let e1_c = Context.add_var x t' c in
+	let Type(t1, e1, cs1, ks1) = get_type e e1_c in
+	let subst = unify cs1 in
+	let t1' = apply_substitution subst t1 VariableSet.empty in
+	let t1'' = quantify e1_c t1' in
+	let new_tc = Context.add_var x t1'' c in
+	let ks = KindConstraintSet.union ks' ks1 in
+	let new_cs = ConstraintSet.add (Equals(t', t1')) cs1 in
+	new_tc, t1'', e1, new_cs, ks
+and get_type_open x (c : Context.t) : Context.t =
+	try match Context.find_var x c with
+		| TModule lst ->
+			let foldf rest elt = match elt with
+				| Value(n, t) ->
+					Context.add_var n t rest
+				| ConcreteType(n, lst, TADT t) ->
+					let kc, c' = type_adt n lst t rest in
+					c'
+				| ConcreteType(_, _, _) ->
+					raise(TypeError("Concrete module type must be ADT for now"))
+				| AbstractType(n, lst) ->
+					let k = List.fold_left (fun rest _ -> KArrow(KStar, rest)) KStar lst in
+					Context.add_kind n k rest
+			in
+			List.fold_left foldf c lst
+		| _ as t ->
+			raise(TypeError("open expression must be statically resolve as a module type; got " ^ string_of_type t))
+	with Not_found -> raise(TypeError("Unbound module: " ^ x))
+and get_type_import (m : string) (c : Context.t) =
+	let com = Util.find_module m in
+	let tc, t, e, cs, ks = get_type_let com m None c in
+	Let(m, Some t, e), tc, cs, ks
 
 let typecheck e verbose =
-	try let Type(t, cs, ks) = get_type e Context.empty in
+	try let Type(t, e', cs, ks) = get_type e Context.empty in
 		(try
 			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
 				Printf.printf "Constraints:\n%s\n" (print_cs cs);
@@ -582,6 +712,6 @@ let typecheck e verbose =
 				Printf.printf "Substitution:\n%s" (print_substitution subst);
 				Printf.printf "Final type: %s\n" (string_of_type res_t)
 			else ignore subst;
-			None
-		with ImpossibleConstraint e -> Some e)
-	with TypeError e -> Some e
+			Result e'
+		with ImpossibleConstraint e -> TError e)
+	with TypeError e -> TError e

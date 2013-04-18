@@ -6,9 +6,9 @@
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
-%token INTERFACE IMPORT END
+%token INTERFACE IMPORT END DOUBLESEMICOLON
 
-%type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
+%type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr program
 %type<Ast.expr> single_expr
 %type<Ast.adt_cons> adt_member
 %type<Ast.adt> adt_list
@@ -19,8 +19,13 @@
 %type<Ast.ltype> type
 %type<bool> BOOLEAN
 
-%start expression
+%start program
 %%
+program:
+	| module_body				{ Module(None, $1) }
+	| module_type inner_module_body
+								{ Module(Some $1, $2) }
+
 expression:
 	single_expr SEMICOLON expression
 								{ Sequence($1, $3) }
@@ -64,6 +69,8 @@ in_expr:
 								{ LetADT($2, $3, $5::$6) }
 	| TYPE IDENTIFIER EQUALS type
 								{ TypeSynonym($2, $4) }
+	| OPEN IDENTIFIER			{ Open $2 }
+	| IMPORT IDENTIFIER			{ Import $2 }
 
 assign_expr:
 	equals_expr ASSIGN equals_expr
@@ -107,9 +114,22 @@ simple_expr:
 	| LBRACE RBRACE				{ Record VarMap.empty }
 	| LBRACE record_list RBRACE	{ Record $2 }
 	| MODULE module_body END	{ Module(None, $2) }
+	| MODULE module_type module_body END
+								{ Module(Some $2, $3) }
 
 module_body:
 	| expression				{ [SingleExpression $1] }
+	| inner_module_body			{ $1 }
+
+inner_module_body:
+	|							{ [] }
+	| module_entry inner_module_body
+								{ $1::$2 }
+
+module_entry:
+	in_expr						{ $1 }
+	| DOUBLESEMICOLON expression
+								{ SingleExpression $2 }
 
 record_list:
 	| IDENTIFIER EQUALS expression
@@ -140,6 +160,9 @@ simple_type:
 	| BOOL						{ TBool }
 	| UNIT						{ TUnit }
 	| IDENTIFIER				{ Typevar $1 }
+	| module_type				{ $1 }
+
+module_type:
 	| INTERFACE LBRACE module_type_body RBRACE
 								{ TModule $3 }
 
@@ -151,11 +174,8 @@ module_type_body:
 module_type_entry:
 	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
 								{ ConcreteType($2, $3, TADT($5::$6)) }
-	| DATA IDENTIFIER parameter_list
+	| TYPE IDENTIFIER parameter_list
 								{ AbstractType($2, $3) }
-	| TYPE IDENTIFIER			{ AbstractType($2, []) }
-	| TYPE IDENTIFIER EQUALS type
-								{ ConcreteType($2, [], $4) }
 	| IDENTIFIER COLON type		{ Value($1, $3) }
 
 record_type_list:

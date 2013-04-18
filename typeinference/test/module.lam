@@ -1,0 +1,22 @@
+let option_m = module
+	interface {
+		data option a = None | Some a,
+		deoptionalize : option int -> int -> int,
+		is_some : option int -> bool
+	}
+
+	data option a = None | Some a
+
+	let deoptionalize = \o. \dflt. match o with {
+		None -> dflt
+		| Some v -> v
+	}
+
+	let is_some = \o. match o with {
+		None -> false
+		| Some _ -> true
+	};;
+
+	print 42
+end in
+option_m
