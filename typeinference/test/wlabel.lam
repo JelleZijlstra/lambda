@@ -1,0 +1,6 @@
+let f = \x. x.bar in
+let f' = \x. x.bar + 1 in
+(print (f' {bar = 3});
+print (f' {bar = 3, foo = 4});
+print (f' {foo = 25});
+(f, f'))

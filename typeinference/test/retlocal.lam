@@ -1,0 +1,8 @@
+let f = \x.
+	data option a = None | Some a in
+	Some x in
+
+let g = \x.
+	data option a b = None | Some a b in
+	Some x true in
+(f, g)

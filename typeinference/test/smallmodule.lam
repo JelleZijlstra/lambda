@@ -1,0 +1,8 @@
+let foo = module
+	interface { foo : int }
+
+	let foo = 42;;
+
+	print 3
+end in
+foo
