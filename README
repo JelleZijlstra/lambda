@@ -14,3 +14,5 @@ there are four variants:
   and higher-order types.
 - subtyping: A fork of the typeinference variant with rudimentary support for
   subtyping on records.
+I wrote these programs primarily to learn, not to provide a useful programming
+language.
