@@ -13,6 +13,8 @@ rule token = parse
 | "+"	{ PLUS }
 | "-"	{ MINUS }
 | "*"	{ TIMES }
+| "/"	{ SLASH }
+| "%"	{ PERCENT }
 | ","	{ COMMA }
 | "ref"	{ REF }
 | "!"	{ BANG }
@@ -56,6 +58,8 @@ rule token = parse
 		{ MATCH }
 | "with"
 		{ WITH }
+| "when"
+		{ WHEN }
 | "module"
 		{ MODULE }
 | "interface"

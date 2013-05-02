@@ -597,33 +597,43 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 	| Match(e, lst) ->
 		let Type(t1, e1, cs1, ks1) = get_type e c in
 		let res_tv = Ast.new_typevar() in
+		let add_list = List.fold_left (fun rest (x, t) -> Context.add_var x t rest) in
 		let foldf (p, e) (lst, cs, ks) =
 			let rec type_pattern p t cs = match p with
-				| PAnything -> (p, [], cs)
-				| PVariable x -> (p, [(x, t)], cs)
-				| PInt _ -> (p, [], ConstraintSet.add (Equals(t, TInt)) cs)
-				| PBool _ -> (p, [], ConstraintSet.add (Equals(t, TBool)) cs)
+				| PAnything -> (p, [], cs, kem)
+				| PVariable x -> (p, [(x, t)], cs, kem)
+				| PInt _ -> (p, [], ConstraintSet.add (Equals(t, TInt)) cs, kem)
+				| PBool _ -> (p, [], ConstraintSet.add (Equals(t, TBool)) cs, kem)
 				| PPair(p1, p2) ->
 					let t1 = Ast.new_typevar() in
 					let t2 = Ast.new_typevar() in
-					let p1, vars1, cs1 = type_pattern p1 t1 cs in
-					let p2, vars2, cs2 = type_pattern p2 t2 cs1 in
-					(PPair(p1, p2), vars1 @ vars2, ConstraintSet.add (Equals(t, TProduct(t1, t2))) cs2)
+					let p1, vars1, cs1, ks1 = type_pattern p1 t1 cs in
+					let p2, vars2, cs2, ks2 = type_pattern p2 t2 cs1 in
+					let cs = ConstraintSet.add (Equals(t, TProduct(t1, t2))) cs2 in
+					(PPair(p1, p2), vars1 @ vars2, cs, KindConstraintSet.union ks1 ks2)
 				| PConstructor x ->
 					let xt = (try instantiate (Context.find_var x c)
 						with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
-					(p, [], ConstraintSet.add (Equals(xt, t)) cs)
+					(p, [], ConstraintSet.add (Equals(xt, t)) cs, kem)
 				| PApplication(p1, p2) ->
 					let t1 = Ast.new_typevar() in
 					let t2 = Ast.new_typevar() in
-					let p1, vars1, cs1 = type_pattern p1 t1 cs in
-					let p2, vars2, cs2 = type_pattern p2 t2 cs1 in
-					(PApplication(p1, p2), vars1 @ vars2, ConstraintSet.add (Equals(t1, TFunction(t2, t))) cs2) in
-			let p, vars, cs = type_pattern p t1 cs in
-			let new_tc = List.fold_left (fun rest (x, t) -> Context.add_var x t rest) c vars in
+					let p1, vars1, cs1, ks1 = type_pattern p1 t1 cs in
+					let p2, vars2, cs2, ks2 = type_pattern p2 t2 cs1 in
+					let cs = ConstraintSet.add (Equals(t1, TFunction(t2, t))) cs2 in
+					(PApplication(p1, p2), vars1 @ vars2, cs, KindConstraintSet.union ks1 ks2)
+				| PGuarded(p, e) ->
+					let p, vars, cs, ks = type_pattern p t cs in
+					let new_tc = add_list c vars in
+					let Type(t', e', cs', ks') = get_type e new_tc in
+					let cs = ConstraintSet.add (Equals(t', TBool)) (ConstraintSet.union cs cs') in
+					(PGuarded(p, e'), vars, cs, KindConstraintSet.union ks ks')
+			in
+			let p, vars, cs, ks'' = type_pattern p t1 cs in
+			let new_tc = add_list c vars in
 			let Type(t', e, cs', ks') = get_type e new_tc in
 			let new_cs = ConstraintSet.add (Equals(res_tv, t')) (ConstraintSet.union cs cs') in
-			let new_ks = KindConstraintSet.union ks ks' in
+			let new_ks = KindConstraintSet.union ks (KindConstraintSet.union ks'' ks') in
 			(p, e)::lst, new_cs, new_ks in
 		let lst, cs, ks = List.fold_right foldf lst ([], cs1, ks1) in
 		Type(res_tv, Match(e1, lst), cs, ks)

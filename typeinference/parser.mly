@@ -6,7 +6,7 @@
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
-%token INTERFACE IMPORT END DOUBLESEMICOLON
+%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr program
 %type<Ast.expr> single_expr
@@ -92,6 +92,10 @@ plus_expr:
 
 times_expr:
 	apply_expr TIMES times_expr	{ Binop(Times, $1, $3) }
+	| apply_expr SLASH times_expr
+								{ Binop(Divide, $1, $3) }
+	| apply_expr PERCENT times_expr
+								{ Binop(Modulo, $1, $3) }
 	| apply_expr				{ $1 }
 
 apply_expr:
@@ -198,8 +202,13 @@ adt_list:
 	| BAR adt_member adt_list	{ $2::$3 }
 
 pattern:
+	| apply_pattern				{ $1 }
+	| apply_pattern WHEN expression
+								{ PGuarded($1, $3) }
+
+apply_pattern:
 	| simple_pattern			{ $1 }
-	| pattern simple_pattern
+	| apply_pattern simple_pattern
 								{ PApplication($1, $2) }
 
 simple_pattern:

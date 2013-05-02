@@ -2,6 +2,8 @@ type binop =
 	Plus
 	| Minus
 	| Times
+	| Divide
+	| Modulo
 
 type boolbinop =
 	Equals
@@ -72,6 +74,7 @@ and pattern =
 	| PInt of int
 	| PBool of bool
 	| PPair of pattern * pattern
+	| PGuarded of pattern * expr
 and value =
 	| VInt of int
 	| VBool of bool

@@ -21,6 +21,7 @@ let rec exists_in_pattern var p = match p with
 	| PVariable x | PConstructor x when x = var -> true
 	| PApplication(p1, p2)
 	| PPair(p1, p2) -> exists_in_pattern var p1 || exists_in_pattern var p2
+	| PGuarded(p, e) -> exists_in_pattern var p
 	| PVariable _ | PConstructor _ | PAnything | PBool _ | PInt _ -> false
 
 type bound_vars = value VarMap.t
@@ -109,6 +110,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 	| ConstructorMember(e, l) -> VConstructor l (* TODO: proper namespacing *)
 	| Match(e, lst) ->
 		let match_expr = eval' e s in
+		let add_list = List.fold_left (fun e (x, v) -> VarMap.add x v e) in
 		let rec eval_pattern p e = match p with
 			| PAnything -> Some []
 			| PVariable v -> Some[(v, e)]
@@ -130,14 +132,22 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 				| VADTInstance(v1, v2) -> (match eval_pattern p1 v1, eval_pattern p2 v2 with
 					| Some lst1, Some lst2 -> Some(lst1 @ lst2)
 					| _, _ -> None)
-				| _ -> None) in
+				| _ -> None)
+			| PGuarded(p, e') -> (match eval_pattern p e with
+				| None -> None
+				| Some lst ->
+					let s = add_list s lst in
+					match eval' e' s with
+					| VBool true -> Some lst
+					| VBool false -> None
+					| _ -> failwith "Pattern guard must return a bool")
+		in
 		let rec eval_match lst = match lst with
 			| [] -> failwith "Inexhaustive pattern matching"
 			| (p, case_body)::tl -> (match eval_pattern p match_expr with
 				| None -> eval_match tl
 				| Some lst ->
-					let foldf e (x, v) = VarMap.add x v e in
-					let s = List.fold_left foldf s lst in
+					let s = add_list s lst in
 					eval' case_body s) in
 		eval_match lst
 	| In(Open m, e) -> eval' e (do_open m s)

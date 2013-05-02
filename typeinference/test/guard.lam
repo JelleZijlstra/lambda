@@ -1,0 +1,11 @@
+let rec collatz = \n. match n with {
+	1 -> 0
+	| n when n % 2 = 0 -> 1 + collatz (n / 2)
+	| n -> 1 + collatz (3 * n + 1)
+}
+
+;;
+
+print(collatz 27);;
+
+collatz 2

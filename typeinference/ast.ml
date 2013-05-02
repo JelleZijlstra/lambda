@@ -2,6 +2,8 @@ type binop =
 	Plus
 	| Minus
 	| Times
+	| Divide
+	| Modulo
 
 type boolbinop =
 	Equals
@@ -75,6 +77,7 @@ and pattern =
 	| PInt of int
 	| PBool of bool
 	| PPair of pattern * pattern
+	| PGuarded of pattern * expr
 and value =
 	| VInt of int
 	| VBool of bool
@@ -142,11 +145,15 @@ let f_of_binop op = match op with
 	| Plus -> (+)
 	| Times -> ( * )
 	| Minus -> (-)
+	| Modulo -> (mod)
+	| Divide -> (/)
 
 let string_of_binop b = match b with
 	| Plus -> "+"
 	| Times -> "*"
 	| Minus -> "-"
+	| Modulo -> "%"
+	| Divide -> "/"
 
 let string_of_bool_binop b = match b with
 	| Equals -> "="
@@ -211,6 +218,7 @@ let rec string_of_expr e =
 			| Some t -> string_of_type t ^ "\n\t" in
 		let body = join "\n\t" (List.map string_of_in_expr lst) in
 		"module\n\t" ^ t_str ^ body ^ "\nend"
+
 and string_of_in_expr e = match e with
 	| Let(x, None, e1) -> "let " ^ x ^ " = " ^ string_of_expr e1
 	| Let(x, Some t, e1) -> "let " ^ x ^ " : " ^ string_of_type t ^ " = " ^ string_of_expr e1
@@ -232,6 +240,8 @@ and string_of_pattern p = match p with
 	| PBool true -> "true"
 	| PBool false -> "false"
 	| PPair(p1, p2) -> "(" ^ string_of_pattern p1 ^ ", " ^ string_of_pattern p2 ^ ")"
+	| PGuarded(p, e) -> string_of_pattern p ^ " when " ^ string_of_expr e
+
 and string_of_value e =
 	match e with
 	| VUnit -> "()"
