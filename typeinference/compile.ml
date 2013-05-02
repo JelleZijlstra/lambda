@@ -38,21 +38,9 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 	| In(Let(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), desugar e1 vm)
 	| In(LetRec(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), Fix(Abstraction(x, t, desugar e1 vm)))
 	| In(TypeSynonym(_, _), e) -> desugar e vm
-	| In(LetADT(_, _, lst), e) ->
-		(* ADT constructors are converted into functions that return nested
-			pairs of values. For example, Cons would become
-					\hd. \tl. [["Cons", hd], tl])
-			That means we can simply treat ADT construction as a function call.
-			Pattern matching can treat ADT deconstruction the same way as pair
-			deconstruction. *)
-		let foldf rest (name, lst) =
-			let vars = List.mapi (fun i _ -> "x" ^ string_of_int i) lst in
-			let result = List.fold_left (fun rest v -> Pair(rest, Var v)) (Constructor name) vars in
-			let f = List.fold_right (fun v rest -> Abstraction(v, None, rest)) vars result in
-			VarMap.add name f rest
-		in
-		let new_vm = List.fold_left foldf vm lst in
-		desugar e new_vm
+	| In(LetADT(_, _, lst), e) -> 
+		let _, vm' = desugar_adt lst vm in
+		desugar e vm'
 	| In(SingleExpression e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)
 	| Constructor x -> VarMap.find x vm
 	| Dummy _ -> failwith "Should not appear in code"
@@ -75,7 +63,9 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 				Case(compile_pattern p1 fst p2', p1_failed, p1_succeeded)
 			| PGuarded(p, e') ->
 				let cont' = If(desugar e' vm, Injection(true, cont), Injection(false, Unit)) in
-				compile_pattern p e cont'
+				let p_failed = Abstraction("_", None, Injection(false, Unit)) in
+				let p_succeeded = Abstraction("x", None, Var "x") in
+				Case(compile_pattern p e cont', p_failed, p_succeeded)
 			| PConstructor x -> If(Boolbinop(Equals, Constructor x, e), Injection(true, cont), Injection(false, Unit))
 			in
 			let new_x = create_new_var() in
@@ -84,10 +74,37 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 		in
 		let mtch = List.fold_left foldf (Error "Inexhaustive pattern match") (List.rev lst) in
 		Application(Abstraction(x, None, mtch), desugar e vm)
-	| ConstructorMember(_, _)
-	| In(Open _, _)
-	| In(Import _, _)
-	| Module _ -> failwith "Not implemented"
+	| ConstructorMember(e, l) -> Member(desugar e vm, l)
+	| In(Open m, e) -> In(Open m, desugar e vm)
+	| In(Import m, e) -> In(Import m, desugar e vm)
+	| Module(t, lst) ->
+		let rec loop lst vm = match lst with
+			| Let(x, t, e)::tl -> Let(x, t, desugar e vm)::loop tl vm
+			| LetRec(x, t, e)::tl -> LetRec(x, t, desugar e vm)::loop tl vm
+			| Open s::tl -> Open s::loop tl vm
+			| Import s::tl -> Import s::loop tl vm
+			| SingleExpression e::tl -> SingleExpression (desugar e vm)::loop tl vm
+			| TypeSynonym _::tl -> loop tl vm
+			| LetADT(_, _, lst)::tl ->
+				let vars, vm' = desugar_adt lst vm in
+				vars @ loop tl vm'
+			| [] -> []
+		in
+		Module(t, loop lst vm)
+and desugar_adt lst vm =
+	(* ADT constructors are converted into functions that return nested
+		pairs of values. For example, Cons would become
+				\hd. \tl. [["Cons", hd], tl])
+		That means we can simply treat ADT construction as a function call.
+		Pattern matching can treat ADT deconstruction the same way as pair
+		deconstruction. *)
+	let foldf (lets, rest) (name, lst) =
+		let vars = List.mapi (fun i _ -> "x" ^ string_of_int i) lst in
+		let result = List.fold_left (fun rest v -> Pair(rest, Var v)) (Constructor name) vars in
+		let f = List.fold_right (fun v rest -> Abstraction(v, None, rest)) vars result in
+		(Let(name, None, f)::lets, VarMap.add name f rest)
+	in
+	List.fold_left foldf ([], vm) lst
 
 let desugar e = desugar e VarMap.empty
 
@@ -120,13 +137,24 @@ let rec compile_rec e = match e with
 	| Record lst ->
 		let foldf l e rest = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
-	| Member(e, l) -> "(" ^ compile_rec e ^ ")." ^ l
+	| Member(e, l) -> "(" ^ compile_rec e ^ ")." ^ translate_var l
 	| In(Let(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
 	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 	| Error e -> "((function() { throw new Error(\"" ^ e ^ "\"); })())"
 	| Constructor x -> "\"" ^ x ^ "\""
-	| ConstructorMember(e, l) -> failwith "not implemented"
-	| Module _ -> failwith "Not implemented"
+	| Module(_, lst) ->
+		let foldf e (body, result) = match e with
+		| SingleExpression e -> compile_rec e ^ "; " ^ body, result
+		| Let(x, _, e) | LetRec(x, _, e) ->
+			let body' = "var " ^ translate_var x ^ " = " ^ compile_rec e ^ "; " ^ body in
+			let result' = "\"" ^ translate_var x ^ "\": " ^ translate_var x ^ ", " ^ result in
+			body', result'
+		| Open s | Import s -> failwith "Not implemented"
+		| LetADT(_, _, _) | TypeSynonym(_, _) -> failwith "Impossible"
+		in
+		let body, result = List.fold_right foldf lst ("", "") in
+		"(function() { " ^ body ^ " return {" ^ result ^ "};})()"
+	| ConstructorMember(_, _)
 	| Dummy _ | In _ | Fix _ | Match(_, _) -> failwith "Impossible"
 
 let compile e =
