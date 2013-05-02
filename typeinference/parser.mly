@@ -99,7 +99,10 @@ apply_expr:
 	| member_expr				{ $1 }
 
 member_expr:
-	member_expr DOT IDENTIFIER	{ Member($1, $3) }
+	| member_expr DOT IDENTIFIER
+								{ Member($1, $3) }
+	| member_expr DOT CONSTRUCTOR
+								{ Member($1, $3) }
 	| simple_expr				{ $1 }
 
 simple_expr:

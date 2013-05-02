@@ -94,6 +94,8 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 	| Member(e, l) -> (match eval' e s with
 		| VRecord lst -> (try VarMap.find l lst
 			with Not_found -> failwith("Unknown label: " ^ l))
+		| VModule(_, lst) -> (try VarMap.find l lst
+			with Not_found -> failwith("Unknown module member: " ^ l))
 		| _ -> failwith "This expression is not a record; member access is not possible")
 	| In(Let(x, t, e1), e2) ->
 		let e1' = eval' e1 s in

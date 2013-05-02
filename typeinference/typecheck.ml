@@ -554,9 +554,22 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		Type(TRecord t, Record lst, cs, ks)
 	| Member(e, l) ->
 		let Type(t, e, cs, ks) = get_type e c in
-		let tv = Ast.new_typevar() in
-		let new_cs = ConstraintSet.add (HasLabel(t, l, tv)) cs in
-		Type(tv, Member(e, l), new_cs, ks)
+		(match t with
+			| TModule lst ->
+				(* Only if the e is immediately resolvable as a module do we interpret this as a module access. *)
+				(* TODO: Change TModule into a map too. *)
+				let rec find_var lst = match lst with
+					| [] -> raise(TypeError("Unbound module member " ^ l ^ " in " ^ string_of_type t))
+					| Value(n, t')::_ when n = l -> t'
+					| ConcreteType(n, params, TADT t)::tl ->
+						let _, c = type_adt n params t Context.empty in
+						(try Context.find_var l c with Not_found -> find_var tl)
+					| _::tl -> find_var tl in
+				Type(find_var lst, e, cs, ks)
+			| _ ->
+				let tv = Ast.new_typevar() in
+				let new_cs = ConstraintSet.add (HasLabel(t, l, tv)) cs in
+				Type(tv, Member(e, l), new_cs, ks))
 	| Constructor n -> (try Type(instantiate (Context.find_var n c), e, em, kem)
 		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
 	| In(LetADT(name, params, lst), e) ->
