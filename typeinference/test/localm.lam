@@ -1,0 +1,9 @@
+let option = module
+	data option a = None | Some a
+end
+
+open option
+
+;;
+
+(None, option)

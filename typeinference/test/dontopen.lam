@@ -1,0 +1,7 @@
+import listm
+
+let l = listm.Cons 3 (listm.Cons 2 listm.Nil)
+
+;;
+
+listm.qsort l

@@ -1,0 +1,7 @@
+let x = match 2 with {
+	n when true -> 3
+}
+
+;;
+
+print x
