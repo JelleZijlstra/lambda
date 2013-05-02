@@ -81,6 +81,9 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 		in
 		let mtch = List.fold_left foldf (Error "Inexhaustive pattern match") (List.rev lst) in
 		Application(Abstraction(x, None, mtch), desugar e vm)
+	| ConstructorMember(_, _)
+	| In(Open _, _)
+	| In(Import _, _)
 	| Module _ -> failwith "Not implemented"
 
 let desugar e = desugar e VarMap.empty
@@ -119,6 +122,7 @@ let rec compile_rec e = match e with
 	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 	| Error e -> "((function() { throw new Error(\"" ^ e ^ "\"); })())"
 	| Constructor x -> "\"" ^ x ^ "\""
+	| ConstructorMember(e, l) -> failwith "not implemented"
 	| Module _ -> failwith "Not implemented"
 	| Dummy _ | In _ | Fix _ | Match(_, _) -> failwith "Impossible"
 
@@ -154,6 +158,7 @@ let rec compile_rec e = match e with
 	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 	| Error e -> "(failwith \"" ^ e ^ "\")"
 	| Constructor x -> "\"" ^ x ^ "\""
+	| ConstructorMember(e, l) -> failwith "not implemented"
 	| Module _ -> failwith "Not implemented"
 	| Dummy _ | In _ | Match(_, _)
 	| Fix _ -> failwith "Impossible"
@@ -203,6 +208,7 @@ let rec compile_rec e = match e with
 	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
 	| Error e -> "(throw(Exception.new(\"" ^ e ^ "\")))"
 	| Constructor x -> "\"" ^ x ^ "\""
+	| ConstructorMember(_, _)
 	| Module _ -> failwith "Not implemented"
 	| In _ | Match(_, _) | Fix _ | Dummy _ -> failwith "Impossible"
 

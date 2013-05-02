@@ -60,6 +60,7 @@ type expr =
 	| Allocation of expr
 	| Record of expr VarMap.t
 	| Member of expr * string
+	| ConstructorMember of expr * string
 	| Unit
 	| Constructor of string
 	| Match of expr * (pattern * expr) list
@@ -196,6 +197,7 @@ let rec string_of_expr e =
 			let start = if accum = "" then "" else accum ^ ", " in
 			start ^ l ^ " = " ^ string_of_expr e in
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
+	| ConstructorMember(e, l)
 	| Member(e, l) -> string_of_expr e ^ "." ^ l
 	| Constructor n -> n
 	| Match(e, lst) ->

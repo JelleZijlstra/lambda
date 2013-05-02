@@ -565,11 +565,23 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 						let _, c = type_adt n params t Context.empty in
 						(try Context.find_var l c with Not_found -> find_var tl)
 					| _::tl -> find_var tl in
-				Type(find_var lst, e, cs, ks)
+				Type(find_var lst, Member(e, l), cs, ks)
 			| _ ->
 				let tv = Ast.new_typevar() in
 				let new_cs = ConstraintSet.add (HasLabel(t, l, tv)) cs in
 				Type(tv, Member(e, l), new_cs, ks))
+	| ConstructorMember(e, l) ->
+		let Type(t, e, cs, ks) = get_type e c in
+		(match t with
+			| TModule lst ->
+				let rec find_var lst = match lst with
+					| [] -> raise(TypeError("Unbound module member " ^ l ^ " in " ^ string_of_type t))
+					| ConcreteType(n, params, TADT t)::tl ->
+						let _, c = type_adt n params t Context.empty in
+						(try Context.find_var l c with Not_found -> find_var tl)
+					| _::tl -> find_var tl in
+				Type(find_var lst, ConstructorMember(e, l), cs, ks)
+			| _ -> raise(TypeError("Constructors can only appear in modules")))
 	| Constructor n -> (try Type(instantiate (Context.find_var n c), e, em, kem)
 		with Not_found -> raise(TypeError("Unbound constructor " ^ n)))
 	| In(LetADT(name, params, lst), e) ->

@@ -106,6 +106,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 	| In(TypeSynonym(_, _), e) (* Type declarations are ignored at runtime *)
 	| In(LetADT(_, _, _), e) -> eval' e s
 	| Constructor n -> VConstructor n
+	| ConstructorMember(e, l) -> VConstructor l (* TODO: proper namespacing *)
 	| Match(e, lst) ->
 		let match_expr = eval' e s in
 		let rec eval_pattern p e = match p with

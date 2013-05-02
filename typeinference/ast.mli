@@ -57,6 +57,7 @@ type expr =
 	| Allocation of expr
 	| Record of expr VarMap.t
 	| Member of expr * string
+	| ConstructorMember of expr * string
 	| Unit
 	| Constructor of string
 	| Match of expr * (pattern * expr) list
