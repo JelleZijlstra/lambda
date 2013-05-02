@@ -38,7 +38,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 	| In(Let(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), desugar e1 vm)
 	| In(LetRec(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), Fix(Abstraction(x, t, desugar e1 vm)))
 	| In(TypeSynonym(_, _), e) -> desugar e vm
-	| In(LetADT(_, _, lst), e) -> 
+	| In(LetADT(_, _, lst), e) ->
 		let _, vm' = desugar_adt lst vm in
 		desugar e vm'
 	| In(SingleExpression e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)

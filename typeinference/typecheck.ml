@@ -24,21 +24,25 @@ module VariableSet = Set.Make(struct
 end)
 
 module Context = struct
-	type t = ltype VarMap.t * kind VarMap.t
+	type t = ltype VarMap.t * kind VarMap.t * string
 
-	let empty = VarMap.empty, VarMap.empty
+	let empty loc = VarMap.empty, VarMap.empty, loc
 
-	let add_var v t (ts, ks) =
-		VarMap.add v t ts, ks
+	let add_var v t (ts, ks, l) =
+		VarMap.add v t ts, ks, l
 
-	let find_var v (ts, _) = VarMap.find v ts
+	let find_var v (ts, _, _) = VarMap.find v ts
 
-	let fold_vars f u (ts, _) = VarMap.fold f ts u
+	let fold_vars f u (ts, _, _) = VarMap.fold f ts u
 
-	let add_kind t k (ts, ks) =
-		ts, VarMap.add t k ks
+	let add_kind t k (ts, ks, l) =
+		ts, VarMap.add t k ks, l
 
-	let find_kind t (_, ks) = VarMap.find t ks
+	let find_kind t (_, ks, _) = VarMap.find t ks
+
+	let get_loc (_, _, l) = l
+
+	let set_loc l (ts, ks, _) = (ts, ks, l)
 end
 
 let em = ConstraintSet.empty
@@ -394,10 +398,10 @@ and type_adt (name : string) (params : string list) (lst : adt) (c : Context.t) 
 		Context.add_var name t rest, ks in
 	let tc', new_ks = List.fold_left foldf (tc, kem) lst in
 	(* Include variables from the ADT definition in the new context, but not kind bindings *)
-	let varc, _ = tc' in
-	let _, kindc = new_tc in
+	let varc, _, _ = tc' in
+	let _, kindc, _ = new_tc in
 	let new_ks = KindConstraintSet.add (KEquals(KVar qualified_name, kind)) new_ks in
-	(new_ks, (varc, kindc))
+	(new_ks, (varc, kindc, Context.get_loc c))
 
 
 (* Handle an optional type (that may or may not be given) plus its kind *)
@@ -562,7 +566,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 					| [] -> raise(TypeError("Unbound module member " ^ l ^ " in " ^ string_of_type t))
 					| Value(n, t')::_ when n = l -> t'
 					| ConcreteType(n, params, TADT t)::tl ->
-						let _, c = type_adt n params t Context.empty in
+						let _, c = type_adt n params t (Context.empty (Context.get_loc c)) in
 						(try Context.find_var l c with Not_found -> find_var tl)
 					| _::tl -> find_var tl in
 				Type(find_var lst, Member(e, l), cs, ks)
@@ -577,7 +581,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 				let rec find_var lst = match lst with
 					| [] -> raise(TypeError("Unbound module member " ^ l ^ " in " ^ string_of_type t))
 					| ConcreteType(n, params, TADT t)::tl ->
-						let _, c = type_adt n params t Context.empty in
+						let _, c = type_adt n params t (Context.empty (Context.get_loc c)) in
 						(try Context.find_var l c with Not_found -> find_var tl)
 					| _::tl -> find_var tl in
 				Type(find_var lst, ConstructorMember(e, l), cs, ks)
@@ -729,12 +733,12 @@ and get_type_open x (c : Context.t) : Context.t =
 			raise(TypeError("open expression must be statically resolve as a module type; got " ^ string_of_type t))
 	with Not_found -> raise(TypeError("Unbound module: " ^ x))
 and get_type_import (m : string) (c : Context.t) =
-	let com = Util.find_module m in
-	let tc, t, e, cs, ks = get_type_let com m None c in
+	let com, new_loc = Util.find_module m (Context.get_loc c) in
+	let tc, t, e, cs, ks = get_type_let com m None (Context.set_loc new_loc c) in
 	Let(m, Some t, e), tc, cs, ks
 
-let typecheck e verbose =
-	try let Type(t, e', cs, ks) = get_type e Context.empty in
+let typecheck e verbose loc =
+	try let Type(t, e', cs, ks) = get_type e (Context.empty loc) in
 		(try
 			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
 				Printf.printf "Constraints:\n%s\n" (print_cs cs);

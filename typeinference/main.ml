@@ -18,7 +18,7 @@ let main () =
 	Arg.parse arguments (fun str -> file := str) "Implementation of the untyped lambda calculus";
 
 	let com = Util.parse_file (!file) in
-	match if !do_no_typecheck then Typecheck.Result com else Typecheck.typecheck com (!do_verbose) with
+	match if !do_no_typecheck then Typecheck.Result com else Typecheck.typecheck com (!do_verbose) (Filename.dirname !file) with
 	| Typecheck.Result com ->
 		if !do_compile
 		then let result = Compile.compile com in

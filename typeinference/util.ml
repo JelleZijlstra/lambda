@@ -13,6 +13,7 @@ let parse_file filename =
 	com
 ;;
 
-let find_module modul =
+let find_module modul loc =
 	(* TODO: search a $PATH *)
-	parse_file (modul ^ ".lam")
+	let name = Filename.concat loc (modul ^ ".lam") in
+	parse_file name, Filename.basename name
