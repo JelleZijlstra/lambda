@@ -66,6 +66,9 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 				let p_failed = Abstraction("_", None, Injection(false, Unit)) in
 				let p_succeeded = Abstraction("x", None, Var "x") in
 				Case(compile_pattern p e cont', p_failed, p_succeeded)
+			| PAs(p, x) ->
+				let cont' = In(Let(x, None, e), cont) in
+				compile_pattern p e cont'
 			| PConstructor x -> If(Boolbinop(Equals, Constructor x, e), Injection(true, cont), Injection(false, Unit))
 			in
 			let new_x = create_new_var() in

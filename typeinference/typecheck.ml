@@ -632,6 +632,9 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 					let Type(t', e', cs', ks') = get_type e new_tc in
 					let cs = ConstraintSet.add (Equals(t', TBool)) (ConstraintSet.union cs cs') in
 					(PGuarded(p, e'), vars, cs, KindConstraintSet.union ks ks')
+				| PAs(p, x) ->
+					let p, vars, cs, ks = type_pattern p t cs in
+					(PAs(p, x), (x, t)::vars, cs, ks)
 			in
 			let p, vars, cs, ks'' = type_pattern p t1 cs in
 			let new_tc = add_list c vars in

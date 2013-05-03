@@ -22,6 +22,7 @@ let rec exists_in_pattern var p = match p with
 	| PApplication(p1, p2)
 	| PPair(p1, p2) -> exists_in_pattern var p1 || exists_in_pattern var p2
 	| PGuarded(p, e) -> exists_in_pattern var p
+	| PAs(p, x) -> exists_in_pattern var p || x = var
 	| PVariable _ | PConstructor _ | PAnything | PBool _ | PInt _ -> false
 
 type bound_vars = value VarMap.t
@@ -141,6 +142,9 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 					| VBool true -> Some lst
 					| VBool false -> None
 					| _ -> failwith "Pattern guard must return a bool")
+			| PAs(p, x) -> (match eval_pattern p e with
+				| None -> None
+				| Some lst -> Some((x, e)::lst))
 		in
 		let rec eval_match lst = match lst with
 			| [] -> failwith "Inexhaustive pattern matching"

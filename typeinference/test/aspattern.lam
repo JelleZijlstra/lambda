@@ -1,0 +1,10 @@
+import listm
+
+open listm
+
+let rec f = \l. match l with {
+	Cons ((a, b) as p) tl -> Cons (a + b, p) (f tl)
+	| Nil -> Nil
+};;
+
+f (Cons (1, 3) Nil)

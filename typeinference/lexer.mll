@@ -60,6 +60,7 @@ rule token = parse
 		{ WITH }
 | "when"
 		{ WHEN }
+| "as"	{ AS }
 | "module"
 		{ MODULE }
 | "interface"

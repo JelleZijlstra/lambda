@@ -78,6 +78,7 @@ and pattern =
 	| PBool of bool
 	| PPair of pattern * pattern
 	| PGuarded of pattern * expr
+	| PAs of pattern * string
 and value =
 	| VInt of int
 	| VBool of bool
@@ -241,6 +242,7 @@ and string_of_pattern p = match p with
 	| PBool false -> "false"
 	| PPair(p1, p2) -> "(" ^ string_of_pattern p1 ^ ", " ^ string_of_pattern p2 ^ ")"
 	| PGuarded(p, e) -> string_of_pattern p ^ " when " ^ string_of_expr e
+	| PAs(p, s) -> string_of_pattern p ^ " as " ^ s
 
 and string_of_value e =
 	match e with

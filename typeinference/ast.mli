@@ -75,6 +75,7 @@ and pattern =
 	| PBool of bool
 	| PPair of pattern * pattern
 	| PGuarded of pattern * expr
+	| PAs of pattern * string
 and value =
 	| VInt of int
 	| VBool of bool

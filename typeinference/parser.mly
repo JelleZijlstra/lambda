@@ -6,7 +6,7 @@
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
-%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH
+%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr program
 %type<Ast.expr> single_expr
@@ -202,9 +202,13 @@ adt_list:
 	| BAR adt_member adt_list	{ $2::$3 }
 
 pattern:
-	| apply_pattern				{ $1 }
-	| apply_pattern WHEN expression
+	| as_pattern				{ $1 }
+	| as_pattern WHEN expression
 								{ PGuarded($1, $3) }
+
+as_pattern:
+	apply_pattern AS IDENTIFIER	{ PAs($1, $3) }
+	| apply_pattern				{ $1 }
 
 apply_pattern:
 	| simple_pattern			{ $1 }
