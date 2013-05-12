@@ -22,7 +22,7 @@ type constant =
 
 type value =
 	VConstant of constant
-	| VFunc of string list * expr
+	| VClosure of string list * value VarMap.t * expr
 	| VObject of value VarMap.t
 	| VRef of value ref
 and expr =
@@ -46,6 +46,7 @@ and expr =
 	| Err of value
 	| Binop of binop * expr * expr
 	| Log of expr
+	| Func of string list * expr
 
 val string_of_expr : expr -> string
 val string_of_value : value -> string

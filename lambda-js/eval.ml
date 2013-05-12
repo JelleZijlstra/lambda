@@ -12,17 +12,18 @@ let rec eval (e : expr) (m : value VarMap.t) : value =
 		| _, _ -> raise(RuntimeError "Field access must be to an object") in
 	match e with
 	| Var x -> (try VarMap.find x m with Not_found -> VConstant CUndefined)
+	| Func(args, body) -> VClosure(args, m, body)
 	| Value v -> v
 	| Let(x, e1, e2) ->
 		let v1 = eval e1 m in
 		eval e2 (VarMap.add x v1 m)
 	| Call(e, args) ->
 		(match eval e m with
-		| VFunc(params, body) ->
+		| VClosure(params, new_m, body) ->
 			let foldf m' param arg =
 				let v = eval arg m in
 				VarMap.add param v m' in
-			let m' = List.fold_left2 foldf m params args in
+			let m' = List.fold_left2 foldf new_m params args in
 			eval body m'
 		| _ -> raise(RuntimeError "This expression is not a function; it cannot be called"))
 	| Access(e1, e2) ->

@@ -23,8 +23,6 @@ constant:
 
 value:
 	constant		{ VConstant $1 }
-	| FUNC LPAREN arg_list RPAREN LBRACE RETURN expr RBRACE
-					{ VFunc($3, $7) }
 	| LBRACE obj_list RBRACE
 					{ VObject $2 }
 
@@ -105,6 +103,8 @@ simple_expr:
 	| ERR value		{ Err $2 }
 	| LOG LPAREN expr RPAREN
 					{ Log $3 }
+	| FUNC LPAREN arg_list RPAREN LBRACE RETURN expr RBRACE
+					{ Func($3, $7) }
 
 arg_list:
 	|				{ [] }

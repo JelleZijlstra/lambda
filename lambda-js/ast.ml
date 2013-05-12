@@ -25,7 +25,7 @@ type constant =
 
 type value =
 	VConstant of constant
-	| VFunc of string list * expr
+	| VClosure of string list * value VarMap.t * expr
 	| VObject of value VarMap.t
 	| VRef of value ref
 and expr =
@@ -49,6 +49,8 @@ and expr =
 	| Err of value
 	| Binop of binop * expr * expr
 	| Log of expr
+	| Func of string list * expr
+
 
 let join glue =
 	List.fold_left (fun a e ->
@@ -81,7 +83,7 @@ let string_of_constant (c : constant) : string =
 let rec string_of_value (v : value) : string =
 	match v with
 	| VConstant c -> string_of_constant c
-	| VFunc(args, expr) -> "func(" ^ join ", " args ^ ") { return " ^ string_of_expr expr ^ " }"
+	| VClosure(args, _, expr) -> "func(" ^ join ", " args ^ ") { return " ^ string_of_expr expr ^ " }"
 	| VObject m ->
 		let lst = VarMap.fold (fun k v rest -> ("\"" ^ k ^ "\": " ^ string_of_value v)::rest) m [] in
 		"{" ^ join ", " lst ^ "}"
@@ -108,4 +110,5 @@ and string_of_expr (e : expr) : string =
 	| Err v -> "err " ^ string_of_value v
 	| Binop(b, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop b ^ " " ^ string_of_expr e2
 	| Log e -> "log(" ^ string_of_expr e ^ ")"
+	| Func(args, expr) -> "func(" ^ join ", " args ^ ") { return " ^ string_of_expr expr ^ " }"
 
