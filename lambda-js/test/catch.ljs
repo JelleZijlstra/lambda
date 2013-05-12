@@ -1,0 +1,7 @@
+foo: {
+	while(true) {
+		break foo "hey"
+	};
+	err "Shouldn't get here"
+};
+42

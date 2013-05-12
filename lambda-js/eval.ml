@@ -1,6 +1,8 @@
 open Ast
 
 exception RuntimeError of string
+exception UserException of value
+exception BreakException of string * value
 
 module StringSet = Set.Make(struct
 	type t = string
@@ -39,7 +41,11 @@ let rec eval (e : expr) (m : value VarMap.t) : value =
 		| _ -> raise(RuntimeError "This expression is not a function; it cannot be called"))
 	| Access(e1, e2) ->
 		let o, s = get_object_and_label e1 e2 in
-		(try VarMap.find s o with Not_found -> VConstant CUndefined)
+		(try VarMap.find s o with Not_found ->
+			(try
+				let proto = VarMap.find "__proto__" o in
+				eval (Access(Deref (Value proto), Value (VConstant (CString s)))) m
+			with Not_found -> VConstant CUndefined))
 	| Assignment(e1, e2, e3) ->
 		let o, s = get_object_and_label e1 e2 in
 		let v3 = eval e3 m in
@@ -47,5 +53,38 @@ let rec eval (e : expr) (m : value VarMap.t) : value =
 	| Delete(e1, e2) ->
 		let o, s = get_object_and_label e1 e2 in
 		VObject(try VarMap.remove s o with Not_found -> o)
+	| Ref e -> VRef(ref (eval e m))
+	| Deref e -> (match eval e m with
+		| VRef v -> !v
+		| _ -> raise(RuntimeError "This expression is not a reference; it cannot be dereferenced"))
+	| SetRef(e1, e2) -> (match eval e1 m with
+		| VRef v -> v := (eval e2 m); VRef v
+		| _ -> raise(RuntimeError "This expression is not a reference; it cannot be assigned to"))
+	| If(e1, e2, e3) -> (match eval e1 m with
+		| VConstant(CBool true) -> eval e2 m
+		| VConstant(CBool false) -> eval e3 m
+		| _ -> raise(RuntimeError "If condition must be a bool"))
+	| Sequence(e1, e2) ->
+		let _ = eval e1 m in
+		eval e2 m
+	| While(e1, e2) as w ->
+		let e' = If(e1, Sequence(e2, w), Value (VConstant CUndefined)) in
+		eval e' m
+	| Err v -> raise(UserException v)
+	| Break(l, e) ->
+		let v = eval e m in
+		raise(BreakException(l, v))
+	| TryCatch(e1, x, e2) -> (try eval e1 m
+		with UserException e -> eval e2 (VarMap.add x e m))
+	| TryFinally(e1, e2) ->
+		let v = try eval e1 m
+			with (UserException _ | BreakException(_, _)) as e ->
+				let _ = eval e2 m in
+				raise e
+		in
+		let _ = eval e2 m in v
+	| LabeledBlock(l, e) ->
+		try eval e m
+		with BreakException(l', v) when l = l' -> v
 
 let eval e = eval e VarMap.empty

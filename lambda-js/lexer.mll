@@ -13,6 +13,17 @@ rule token = parse
 | "let"		{ LET }
 | "in"		{ IN }
 | "delete"	{ DELETE }
+| "ref"		{ REF }
+| "deref"	{ DEREF }
+| "if"		{ IF }
+| "else"	{ ELSE }
+| "while"	{ WHILE }
+| "break"	{ BREAK }
+| "try"		{ TRY }
+| "catch"	{ CATCH }
+| "finally"	{ FINALLY }
+| "err"		{ ERR }
+| ";"		{ SEMICOLON }
 | "{"		{ LBRACE }
 | "}"		{ RBRACE }
 | ","		{ COMMA }
