@@ -1,3 +1,3 @@
-let x = (func(foo) { return func() { return log(foo) }})(42) in
+let x = (function(foo) { return function() { return log(foo) }})(42) in
 let foo = 43 in
 x()

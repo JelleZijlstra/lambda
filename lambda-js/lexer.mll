@@ -8,6 +8,8 @@ rule token = parse
 | "null"	{ NULL }
 | "undefined"
 			{ UNDEFINED }
+| "function"
+			{ FUNC }
 | "func"	{ FUNC }
 | "return"	{ RETURN }
 | "let"		{ LET }
@@ -55,7 +57,7 @@ rule token = parse
 			{ token lexbuf } (* ignore whitespace *)
 | "#" [^'\n']+
 			{ token lexbuf} (* comments *)
-| eof	{ EOF }
+| eof		{ EOF }
 | _ as c
 			{
 				Printf.printf "Unrecognized character: [%c]\n" c;
