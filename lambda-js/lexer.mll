@@ -23,6 +23,7 @@ rule token = parse
 | "catch"	{ CATCH }
 | "finally"	{ FINALLY }
 | "err"		{ ERR }
+| "log"		{ LOG }
 | ";"		{ SEMICOLON }
 | "{"		{ LBRACE }
 | "}"		{ RBRACE }
@@ -33,6 +34,17 @@ rule token = parse
 | "]"		{ RBRACKET }
 | "("		{ LPAREN }
 | ")"		{ RPAREN }
+| "+"		{ PLUS }
+| "*"		{ TIMES }
+| "-"		{ MINUS }
+| "/"		{ SLASH }
+| "=="		{ DOUBLEEQUALS }
+| "!="		{ NEQUALS }
+| ">"		{ GT }
+| ">="		{ GTE }
+| "<"		{ LT }
+| "<="		{ LTE }
+| "++"		{ CONCAT }
 | ['A'-'Z' 'a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
 			{ IDENTIFIER(n) } (* variable names *)
 | ['0'-'9']+ as n

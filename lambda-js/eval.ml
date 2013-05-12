@@ -4,20 +4,6 @@ exception RuntimeError of string
 exception UserException of value
 exception BreakException of string * value
 
-module StringSet = Set.Make(struct
-	type t = string
-	let compare = compare
-end)
-
-let set_of_list lst = List.fold_left (fun x y -> StringSet.add y x) StringSet.empty lst
-
-let next_var : unit -> string =
-	let curr = ref 0 in
-	fun () ->
-		let res = "var" ^ (string_of_int (!curr)) in
-		curr := !curr + 1;
-		res
-
 let rec eval (e : expr) (m : value VarMap.t) : value =
 	let get_object_and_label (e1 : expr) (e2 : expr) : (value VarMap.t * string) =
 		match eval e1 m, eval e2 m with
@@ -84,7 +70,48 @@ let rec eval (e : expr) (m : value VarMap.t) : value =
 		in
 		let _ = eval e2 m in v
 	| LabeledBlock(l, e) ->
-		try eval e m
-		with BreakException(l', v) when l = l' -> v
+		(try eval e m
+		with BreakException(l', v) when l = l' -> v)
+	| Log e ->
+		let v = eval e m in
+		Printf.printf "%s\n" (string_of_value v);
+		VConstant CUndefined
+	| Binop(bo, e1, e2) ->
+		(* Ensure order of execution *)
+		let v1 = eval e1 m in
+		let v2 = eval e2 m in
+		eval_binop bo v1 v2
+and eval_binop (bo : binop) (v1 : value) (v2 : value) : value =
+	let f_of_int_binop (bo : binop) : int -> int -> int =
+		match bo with
+		| Add -> (+)
+		| Subtract -> (-)
+		| Multiply -> ( * )
+		| Divide -> (/)
+		| _ -> failwith "Impossible" in
+	let f_of_int_bool_binop (bo : binop) : int -> int -> bool =
+		match bo with
+		| Less -> (<)
+		| LE -> (<=)
+		| Greater -> (>)
+		| GE -> (>=)
+		| _ -> failwith "Impossible" in
+	let eval_int_binop (bo : binop) (v1 : value) (v2 : value) : value =
+		match v1, v2 with
+		| VConstant(CInt n1), VConstant(CInt n2) -> VConstant(CInt(f_of_int_binop bo n1 n2))
+		| _, _ -> raise(RuntimeError(string_of_binop bo ^ " is only defined on ints")) in
+	let eval_int_bool_binop (bo : binop) (v1 : value) (v2 : value) : value =
+		match v1, v2 with
+		| VConstant(CInt n1), VConstant(CInt n2) -> VConstant(CBool(f_of_int_bool_binop bo n1 n2))
+		| _, _ -> raise(RuntimeError(string_of_binop bo ^ " is only defined on ints")) in
+	match bo, v1, v2 with
+	| Add, _, _ | Subtract, _, _ | Multiply, _, _ | Divide, _, _ ->
+		eval_int_binop bo v1 v2
+	| Less, _, _ | Greater, _, _ | LE, _, _ | GE, _, _ ->
+		eval_int_bool_binop bo v1 v2
+	| Concat, VConstant(CString s1), VConstant(CString s2) -> VConstant(CString(s1 ^ s2))
+	| Concat, _, _ -> raise(RuntimeError("++ is only defined on strings"))
+	| Equals, _, _ -> VConstant(CBool(v1 = v2))
+	| NEquals, _, _ -> VConstant(CBool(v1 <> v2))
 
 let eval e = eval e VarMap.empty

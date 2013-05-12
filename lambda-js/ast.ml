@@ -3,6 +3,19 @@ module VarMap : Map.S with type key = string = Map.Make(struct
 	let compare = compare
 end)
 
+type binop =
+	Add
+	| Multiply
+	| Subtract
+	| Divide
+	| Equals
+	| NEquals
+	| Less
+	| Greater
+	| LE
+	| GE
+	| Concat
+
 type constant =
 	CInt of int
 	| CString of string
@@ -34,11 +47,27 @@ and expr =
 	| TryCatch of expr * string * expr
 	| TryFinally of expr * expr
 	| Err of value
+	| Binop of binop * expr * expr
+	| Log of expr
 
 let join glue =
 	List.fold_left (fun a e ->
 		let start = if a = "" then "" else a ^ glue in
 		start ^ e) ""
+
+let string_of_binop (b : binop) : string =
+	match b with
+	| Add -> "+"
+	| Subtract -> "-"
+	| Multiply -> "*"
+	| Divide -> "/"
+	| Equals -> "=="
+	| NEquals -> "!="
+	| LE -> "<="
+	| GE -> ">="
+	| Less -> "<"
+	| Greater -> ">"
+	| Concat -> "++"
 
 let string_of_constant (c : constant) : string =
 	match c with
@@ -77,4 +106,6 @@ and string_of_expr (e : expr) : string =
 	| TryCatch(e1, x, e2) -> "try { " ^ string_of_expr e1 ^ " } catch(" ^ x ^ ") { " ^ string_of_expr e2 ^ " }"
 	| TryFinally(e1, e2) -> "try { " ^ string_of_expr e1 ^ " } finally { " ^ string_of_expr e2 ^ " }"
 	| Err v -> "err " ^ string_of_value v
+	| Binop(b, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop b ^ " " ^ string_of_expr e2
+	| Log e -> "log(" ^ string_of_expr e ^ ")"
 

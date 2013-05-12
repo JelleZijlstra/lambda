@@ -1,5 +1,18 @@
 module VarMap : Map.S with type key = string
 
+type binop =
+	Add
+	| Multiply
+	| Subtract
+	| Divide
+	| Equals
+	| NEquals
+	| Less
+	| Greater
+	| LE
+	| GE
+	| Concat
+
 type constant =
 	CInt of int
 	| CString of string
@@ -31,6 +44,9 @@ and expr =
 	| TryCatch of expr * string * expr
 	| TryFinally of expr * expr
 	| Err of value
+	| Binop of binop * expr * expr
+	| Log of expr
 
 val string_of_expr : expr -> string
 val string_of_value : value -> string
+val string_of_binop : binop -> string
