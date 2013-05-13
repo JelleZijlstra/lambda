@@ -31,7 +31,6 @@ and expr =
 	| Let of string * expr * expr
 	| Call of expr * expr list
 	| Access of expr * expr
-	| Assignment of expr * expr * expr
 	| Delete of expr * expr
 	| Ref of expr
 	| Deref of expr

@@ -1,0 +1,7 @@
+let o = {
+	"foo": 42,
+	"bar": 3
+} in
+(log(o);
+let o = (o["foo"] = 43) in
+log(o))

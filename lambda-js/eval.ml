@@ -33,7 +33,7 @@ let rec eval (e : expr) (m : value VarMap.t) : value =
 				let proto = VarMap.find "__proto__" o in
 				eval (Access(Deref (Value proto), Value (VConstant (CString s)))) m
 			with Not_found -> VConstant CUndefined))
-	| Assignment(e1, e2, e3) ->
+	| SetRef(Access(e1, e2), e3) ->
 		let o, s = get_object_and_label e1 e2 in
 		let v3 = eval e3 m in
 		VObject (VarMap.add s v3 o)

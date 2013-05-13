@@ -42,9 +42,7 @@ access_expr:
 					{ Call($1, $3) }
 	| access_expr LBRACKET expr RBRACKET
 					{ Access($1, $3) }
-	| access_expr LBRACKET expr RBRACKET EQUALS compare_expr
-					{ Assignment($1, $3, $6) }
-	| compare_expr EQUALS compare_expr
+	| access_expr EQUALS compare_expr
 					{ SetRef($1, $3) }
 
 compare_expr:
@@ -79,7 +77,7 @@ times_expr:
 	| simple_expr	{ $1 }
 
 simple_expr:
-	| DELETE expr LBRACKET expr RBRACKET
+	| DELETE compare_expr LBRACKET expr RBRACKET
 					{ Delete($2, $4) }
 	| IDENTIFIER	{ Var $1 }
 	| constant		{ Value(VConstant $1) }

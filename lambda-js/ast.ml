@@ -34,7 +34,6 @@ and expr =
 	| Let of string * expr * expr
 	| Call of expr * expr list
 	| Access of expr * expr
-	| Assignment of expr * expr * expr
 	| Delete of expr * expr
 	| Ref of expr
 	| Deref of expr
@@ -95,7 +94,6 @@ and string_of_expr (e : expr) : string =
 	| Let(x, e1, e2) -> "let " ^ x ^ " = " ^ string_of_expr e1 ^ " in " ^ string_of_expr e2
 	| Call(f, args) -> string_of_expr f ^ "(" ^ join ", " (List.map string_of_expr args) ^ ")"
 	| Access(e1, e2) -> string_of_expr e1 ^ "[" ^ string_of_expr e2 ^ "]"
-	| Assignment(e1, e2, e3) -> string_of_expr e1 ^ "[" ^ string_of_expr e2 ^ "] = " ^ string_of_expr e3
 	| Delete(e1, e2) -> "delete " ^ string_of_expr e1 ^ "[" ^ string_of_expr e2 ^ "]"
 	| Ref e -> "ref " ^ string_of_expr e
 	| Deref e -> "deref " ^ string_of_expr e
