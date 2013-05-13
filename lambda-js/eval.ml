@@ -17,8 +17,8 @@ let rec eval (e : expr) (m : value VarMap.t) : value =
 	| Let(x, e1, e2) ->
 		let v1 = eval e1 m in
 		eval e2 (VarMap.add x v1 m)
-	| Call(e, args) ->
-		(match eval e m with
+	| Call(e', args) ->
+		(match eval e' m with
 		| VClosure(params, new_m, body) ->
 			let foldf m' param arg =
 				let v = eval arg m in
@@ -77,6 +77,8 @@ let rec eval (e : expr) (m : value VarMap.t) : value =
 		let v = eval e m in
 		Printf.printf "%s\n" (string_of_value v);
 		VConstant CUndefined
+	| Object o ->
+		VObject(VarMap.fold (fun k e rest -> VarMap.add k (eval e m) rest) o VarMap.empty)
 	| Binop(bo, e1, e2) ->
 		(* Ensure order of execution *)
 		let v1 = eval e1 m in

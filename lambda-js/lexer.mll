@@ -55,7 +55,7 @@ rule token = parse
 			{ STRING s }
 | [' ' '\t' '\n']
 			{ token lexbuf } (* ignore whitespace *)
-| "#" [^'\n']+
+| "//" [^'\n']+
 			{ token lexbuf} (* comments *)
 | eof		{ EOF }
 | _ as c

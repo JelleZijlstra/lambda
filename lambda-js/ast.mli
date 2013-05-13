@@ -47,6 +47,7 @@ and expr =
 	| Binop of binop * expr * expr
 	| Log of expr
 	| Func of string list * expr
+	| Object of expr VarMap.t
 
 val string_of_expr : expr -> string
 val string_of_value : value -> string

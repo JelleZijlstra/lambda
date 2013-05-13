@@ -50,7 +50,7 @@ and expr =
 	| Binop of binop * expr * expr
 	| Log of expr
 	| Func of string list * expr
-
+	| Object of expr VarMap.t
 
 let join glue =
 	List.fold_left (fun a e ->
@@ -111,4 +111,7 @@ and string_of_expr (e : expr) : string =
 	| Binop(b, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop b ^ " " ^ string_of_expr e2
 	| Log e -> "log(" ^ string_of_expr e ^ ")"
 	| Func(args, expr) -> "func(" ^ join ", " args ^ ") { return " ^ string_of_expr expr ^ " }"
+	| Object m ->
+		let lst = VarMap.fold (fun k v rest -> ("\"" ^ k ^ "\": " ^ string_of_expr v)::rest) m [] in
+		"{" ^ join ", " lst ^ "}"
 

@@ -21,11 +21,6 @@ constant:
 	| NULL			{ CNull }
 	| UNDEFINED		{ CUndefined }
 
-value:
-	constant		{ VConstant $1 }
-	| LBRACE obj_list RBRACE
-					{ VObject $2 }
-
 expr:
 	| let_expr SEMICOLON expr
 					{ Sequence($1, $3) }
@@ -87,7 +82,7 @@ simple_expr:
 	| DELETE expr LBRACKET expr RBRACKET
 					{ Delete($2, $4) }
 	| IDENTIFIER	{ Var $1 }
-	| value			{ Value $1 }
+	| constant		{ Value(VConstant $1) }
 	| LPAREN expr RPAREN
 					{ $2 }
 	| IF LPAREN expr RPAREN LBRACE expr RBRACE ELSE LBRACE expr RBRACE
@@ -100,11 +95,13 @@ simple_expr:
 					{ TryCatch($3, $7, $10) }
 	| TRY LBRACE expr RBRACE FINALLY LBRACE expr RBRACE
 					{ TryFinally($3, $7) }
-	| ERR value		{ Err $2 }
+	| ERR constant	{ Err(VConstant $2) }
 	| LOG LPAREN expr RPAREN
 					{ Log $3 }
 	| FUNC LPAREN arg_list RPAREN LBRACE RETURN expr RBRACE
 					{ Func($3, $7) }
+	| LBRACE obj_list RBRACE
+					{ Object $2 }
 
 arg_list:
 	|				{ [] }
@@ -118,12 +115,12 @@ inner_arg_list:
 
 obj_list:
 	|				{ VarMap.empty }
-	| STRING COLON value inner_obj_list
+	| STRING COLON expr inner_obj_list
 					{ VarMap.add $1 $3 $4 }
 
 inner_obj_list:
 	| 				{ VarMap.empty }
-	| COMMA STRING COLON value inner_obj_list
+	| COMMA STRING COLON expr inner_obj_list
 					{ VarMap.add $2 $4 $5 }
 
 expr_list:

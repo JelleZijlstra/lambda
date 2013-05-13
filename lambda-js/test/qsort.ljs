@@ -1,0 +1,56 @@
+let cons = function(hd, tl) { return {"head": hd, "tail": tl}} in
+let nil = {} in
+let is_nil = function(lst) { return (lst["head"]) == undefined } in
+let hd = function(lst) { return lst["head"] } in
+let tl = function(lst) { return lst["tail"] } in
+
+let Z = function(f) { return (function(x) { return f(function(v) { return (x(x))(v) })})(function(x) { return f(function(v) { return (x(x))(v) })}) } in
+
+let curry = function(f) { return function(a) { return function(b) { return f(a, b) }}} in
+let uncurry = function(f) { return function(a, b) { return f(a)(b) }} in
+
+let filter = function(filter) { return function(f) { return function(lst) { return if(is_nil(lst)) {
+	nil
+} else {
+	let head = hd(lst) in
+	let tail = tl(lst) in
+	if(f(head)) {
+		cons(head, (filter(f))(tail))
+	} else {
+		(filter(f))(tail)
+	}
+}}}} in
+let filter = Z(filter) in
+// Uncurry it
+let filter = uncurry(filter) in
+
+let rev_append = function(rev_append) { return function(lst) { return function(accum) { return if(is_nil(lst)) {
+	accum
+} else {
+	rev_append(tl(lst))(cons(hd(lst), accum))
+}}}} in
+let rev_append = uncurry(Z(rev_append)) in
+let reverse = function(lst) { return rev_append(lst, nil) } in
+let append = function(lst1, lst2) { return rev_append(reverse(lst1), lst2) } in
+
+let qsort = function(qsort) { return function(lst) { return if(is_nil(lst)) {
+	lst
+} else {
+	let head = hd(lst) in
+	let tail = tl(lst) in
+	let left = filter(function(elt) { return elt < head }, tail) in
+	let right = filter(function(elt) { return elt >= head }, tail) in
+	append(qsort(left), cons(head, qsort(right)))
+}}} in
+let qsort = Z(qsort) in
+
+let lst = cons(4, (cons(2, nil))) in
+let lst2 = cons(3, cons(5, cons(7, cons(2, cons(1, cons(8, cons(10, cons(5, nil)))))))) in
+(log(lst);
+log(filter);
+log(lst2);
+log(reverse(lst));
+log(append(lst, lst2));
+log(qsort(lst2));
+
+filter(function(x) { return x > 3 }, lst))

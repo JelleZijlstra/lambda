@@ -1,0 +1,6 @@
+function() { return if(3 == 3) {
+		log(true)
+	} else {
+		log(false)
+	}
+}

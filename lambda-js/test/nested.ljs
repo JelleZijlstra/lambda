@@ -1,0 +1,3 @@
+let filter = function(filter) { return function(f) { return function(lst) { return if(is_nil(lst)) { null } else { null } }}} in
+
+log(filter)
