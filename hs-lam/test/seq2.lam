@@ -1,0 +1,2 @@
+let x = print 3 in
+x x

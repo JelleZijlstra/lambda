@@ -1,0 +1,3 @@
+let x = print 3 in
+let y = print 4 in
+x + (\x. x)

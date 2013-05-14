@@ -7,3 +7,11 @@ lexer.ml
 parser.mli
 *.o
 lambdaopt
+*.hi
+jc
+ljs
+parser.output
+*.hi
+parser.hs
+lexer.hs
+hslam
