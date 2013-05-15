@@ -16,6 +16,6 @@ let main () =
 	then let result = Compile.compile com in
 		Printf.printf "%s\n" result
 	else let result = (if !do_cbn then Eval.eval_cbn else Eval.eval_cbv) com in
-		Printf.printf "Result: %s\n" (Ast.string_of_expr result)
+		Printf.printf "Result: %s\n" (Ast.string_of_value result)
 
 let _ = main();;

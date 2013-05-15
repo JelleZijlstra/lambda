@@ -5,6 +5,8 @@ type binop =
 type unop =
 	Print
 
+module VarMap = Map.Make(struct type t = string let compare = compare end)
+
 type expr =
 	Var of string
 	| Abstraction of string * expr
@@ -12,6 +14,11 @@ type expr =
 	| Integer of int
 	| Binop of binop * expr * expr
 	| Unop of unop * expr
+
+type value =
+	VClosure of string * value VarMap.t * expr
+	| VInteger of int
+	| VDummy of value VarMap.t * expr
 
 let f_of_binop op = match op with
 	| Plus -> (+)
@@ -37,3 +44,8 @@ let rec string_of_expr e =
 	| Application(e1, e2) -> string_of_expr e1 ^ " " ^ string_of_expr e2
 	| Binop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop op ^ " " ^ string_of_expr e2
 	| Unop(op, e) -> string_of_unop op ^ " " ^ string_of_expr e
+and string_of_value v =
+	match v with
+	| VClosure(x, _, e) -> "\\" ^ x ^ ". " ^ string_of_expr e
+	| VInteger n -> string_of_int n
+	| VDummy(_, e) -> string_of_expr e
