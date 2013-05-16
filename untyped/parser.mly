@@ -16,7 +16,6 @@ expression:
 								{ Abstraction($2, $4) }
 	| LET IDENTIFIER EQUALS expression IN expression
 								{ Application(Abstraction($2, $6), $4) }
-	| PRINT expression			{ Unop(Print, $2) }
 	| plus_expr					{ $1 }
 
 plus_expr:
@@ -29,6 +28,7 @@ times_expr:
 
 apply_expr:
 	apply_expr simple_expr		{ Application($1, $2) }
+	| PRINT simple_expr			{ Unop(Print, $2) }
 	| simple_expr				{ $1 }
 
 simple_expr:
