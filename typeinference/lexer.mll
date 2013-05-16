@@ -54,6 +54,8 @@ rule token = parse
 		{ TYPE }
 | "data"
 		{ DATA }
+| "forall"
+		{ FORALL }
 | "match"
 		{ MATCH }
 | "with"

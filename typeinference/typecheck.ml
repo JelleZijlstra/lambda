@@ -24,25 +24,31 @@ module VariableSet = Set.Make(struct
 end)
 
 module Context = struct
-	type t = ltype VarMap.t * kind VarMap.t * string
+	type t = ltype VarMap.t * kind VarMap.t * ltype VarMap.t * string
 
-	let empty loc = VarMap.empty, VarMap.empty, loc
+	let empty loc = VarMap.empty, VarMap.empty, VarMap.empty, loc
 
-	let add_var v t (ts, ks, l) =
-		VarMap.add v t ts, ks, l
+	let add_var v t (ts, ks, tss, l) =
+		VarMap.add v t ts, ks, tss, l
 
-	let find_var v (ts, _, _) = VarMap.find v ts
+	let find_var v (ts, _, _, _) = VarMap.find v ts
 
-	let fold_vars f u (ts, _, _) = VarMap.fold f ts u
+	let fold_vars f u (ts, _, _, _) = VarMap.fold f ts u
 
-	let add_kind t k (ts, ks, l) =
-		ts, VarMap.add t k ks, l
+	let add_kind t k (ts, ks, vss, l) =
+		ts, VarMap.add t k ks, vss, l
 
-	let find_kind t (_, ks, _) = VarMap.find t ks
+	let find_kind t (_, ks, _, _) = VarMap.find t ks
 
-	let get_loc (_, _, l) = l
+	let add_type_synonym x t (ts, ks, vss, l) =
+		ts, ks, VarMap.add x t vss, l
 
-	let set_loc l (ts, ks, _) = (ts, ks, l)
+	let find_type_synonym x (_, _, vss, _) =
+		try Some(VarMap.find x vss) with Not_found -> None
+
+	let get_loc (_, _, _, l) = l
+
+	let set_loc l (ts, ks, vss, _) = (ts, ks, vss, l)
 end
 
 let em = ConstraintSet.empty
@@ -122,6 +128,24 @@ let quantify (ctxt : Context.t) (t : ltype) : ltype =
 let instantiate t = match t with
 	| TForAll(lst, t') -> List.fold_left (fun t tv -> replace_in_type tv (new_typevar()) t) t' lst
 	| _ -> t
+
+(* Select the more specialized type (useful for module typing at check time) *)
+let rec select_type t1 t2 = match t1, t2 with
+	| Typevar _, _ -> t2
+	| _, Typevar _ -> t1
+	| TFunction(t1a, t1b), TFunction(t2a, t2b) -> TFunction(select_type t1a t1b, select_type t2a t2b)
+	| TProduct(t1a, t1b), TProduct(t2a, t2b) -> TProduct(select_type t1a t1b, select_type t2a t2b)
+	| TSum(t1a, t1b), TSum(t2a, t2b) -> TSum(select_type t1a t1b, select_type t2a t2b)
+	| _ -> t1 (* Not worth it for the rest *)
+
+let mapify_module_type (actual : module_type_entry list) : module_type_entry VarMap.t * ltype VarMap.t =
+	let foldf (tmap, vmap) entry = match entry with
+		| ConcreteType(n, _, _) | AbstractType(n, _) ->
+			(VarMap.add n entry tmap, vmap)
+		| Value(x, t) ->
+			(tmap, VarMap.add x t vmap)
+	in
+	List.fold_left foldf (VarMap.empty, VarMap.empty) actual
 
 exception ImpossibleConstraint of string
 
@@ -258,6 +282,8 @@ let rec unify (cs : ConstraintSet.t) : substitution =
 			let new_cs = ConstraintSet.add (Equals(t', t)) new_set in
 			unify new_cs
 		| HasLabel(t, l, t') -> raise(ImpossibleConstraint("Type is not a record type: " ^ string_of_type t))
+(* 		| Equals(TModule t1, TModule t2) ->
+ *)
 		| Equals(t1, t2) ->
 			let types = string_of_type t1 ^ " and " ^ string_of_type t2 in
 			raise(ImpossibleConstraint("Cannot unify types: " ^ types)))
@@ -311,74 +337,85 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 			| Value(n, t)::tl -> Value(n, apply_substitution s t b)::loop tl b in
 		TModule(loop lst b)
 
-let rec get_kind (t : ltype) (c : Context.t) : kind * KindConstraintSet.t =
+let rec get_kind (t : ltype) (c : Context.t) : ltype * kind * KindConstraintSet.t =
 	let add = KindConstraintSet.add in
 	let union = KindConstraintSet.union in
-	match t with
-	| TInt | TBool | TUnit -> KStar, kem
-	| TProduct(t1, t2) | TSum(t1, t2) | TFunction(t1, t2) ->
-		let k1, kc1 = get_kind t1 c in
-		let k2, kc2 = get_kind t2 c in
+	let type_binary t1 t2 =
+		let t1, k1, kc1 = get_kind t1 c in
+		let t2, k2, kc2 = get_kind t2 c in
 		let kc = add (KEquals(k1, KStar)) (add (KEquals(k2, KStar)) (union kc1 kc2)) in
-		KStar, kc
+		t1, t2, kc in
+	match t with
+	| TInt | TBool | TUnit -> t, KStar, kem
+	| TProduct(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TProduct(t1, t2), KStar, kc
+	| TSum(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TSum(t1, t2), KStar, kc
+	| TFunction(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TFunction(t1, t2), KStar, kc
 	| TRef t ->
-		let k, kc = get_kind t c in
+		let t, k, kc = get_kind t c in
 		let kc = add (KEquals(k, KStar)) kc in
-		KStar, kc
+		TRef t, KStar, kc
 	| Typevar tv ->
-		(try Context.find_kind tv c, kem
+		(try
+			let k = Context.find_kind tv c in
+			let t = match Context.find_type_synonym tv c with
+				| Some t' -> t'
+				| None -> Typevar tv in
+			t, k, kem
 		with Not_found -> raise(TypeError("Unbound type variable: " ^ tv)))
-	| TypeWithLabel(_, lst) ->
-		let foldf rest (_, t) =
-			let k, kc = get_kind t c in
-			add (KEquals(k, KStar)) (union kc rest) in
-		let kc = List.fold_left foldf kem lst in
-		KStar, kc
+	| TypeWithLabel(n, lst) ->
+		let foldf (l, t) (lst, rest) =
+			let t, k, kc = get_kind t c in
+			(l, t)::lst, add (KEquals(k, KStar)) (union kc rest) in
+		let lst, kc = List.fold_right foldf lst ([], kem) in
+		TypeWithLabel(n, lst), KStar, kc
 	| TRecord lst ->
-		let foldf _ t rest =
-			let k, kc = get_kind t c in
-			add (KEquals(k, KStar)) (union kc rest) in
-		let kc = VarMap.fold foldf lst kem in
-		KStar, kc
+		let foldf l t (map, rest) =
+			let t, k, kc = get_kind t c in
+			VarMap.add l t map, add (KEquals(k, KStar)) (union kc rest) in
+		let map, kc = VarMap.fold foldf lst (VarMap.empty, kem) in
+		TRecord map, KStar, kc
 	| TForAll(lst, t') ->
 		let foldf (c, vars) x =
 			let kv = Ast.new_kindvar() in
 			Context.add_kind x kv c, kv::vars in
 		let new_c, vars = List.fold_left foldf (c, []) lst in
-		let res, kc = get_kind t' new_c in
+		let t', res, kc = get_kind t' new_c in
 		let k = List.fold_left (fun rest kv -> KArrow(kv, rest)) res vars in
-		k, kc
+		TForAll(lst, t'), k, kc
 	| TADT lst ->
-		let foldf rest (_, lst) =
-			let inner_foldf rest t =
-				let k1, kc1 = get_kind t c in
-				add (KEquals(k1, KStar)) (union kc1 rest) in
-			List.fold_left inner_foldf rest lst in
-		let kc = List.fold_left foldf kem lst in
-		KStar, kc
+		let foldf (cons, lst) (t, rest) =
+			let inner_foldf t (params, rest) =
+				let t1, k1, kc1 = get_kind t c in
+				t1::params, add (KEquals(k1, KStar)) (union kc1 rest) in
+			let params, kc = List.fold_right inner_foldf lst ([], rest) in
+			((cons, params)::t, kc) in
+		let lst', kc = List.fold_right foldf lst ([], kem) in
+		TADT lst', KStar, kc
 	| TParameterized(t1, t2) ->
-		let k1, kc1 = get_kind t1 c in
-		let k2, kc2 = get_kind t2 c in
+		let t1', k1, kc1 = get_kind t1 c in
+		let t2', k2, kc2 = get_kind t2 c in
 		let result_k = Ast.new_kindvar() in
-		result_k, add (KEquals(k1, KArrow(k2, result_k))) (union kc1 kc2)
+		TParameterized(t1', t2'), result_k, add (KEquals(k1, KArrow(k2, result_k))) (union kc1 kc2)
 	| TModule lst ->
  		let rec loop lst c = match lst with
-			| [] -> kem
+			| [] -> ([], kem)
 			| Value(n, t)::tl ->
-				let k, kc = get_kind t c in
-				let rest = loop tl c in
-				add (KEquals(k, KStar)) (union kc rest)
+				let t', k, kc = get_kind t c in
+				let lst, rest = loop tl c in
+				Value(n, t')::lst, union kc rest
 			| ConcreteType(n, lst, TADT t)::tl ->
 				let kc, c' = type_adt n lst t c in
-				let rest = loop tl c' in
-				union kc rest
+				let lst', rest = loop tl c' in
+				ConcreteType(n, lst, TADT t)::lst', union kc rest
 			| ConcreteType(_, _, _)::_ ->
 				raise(TypeError("Concrete module type must be ADT for now"))
 			| AbstractType(n, lst)::tl ->
 				let k = List.fold_left (fun rest _ -> KArrow(KStar, rest)) KStar lst in
 				let c' = Context.add_kind n k c in
-				loop tl c' in
-		KStar, loop lst c
+				let lst', rest = loop tl c' in
+				AbstractType(n, lst)::lst', rest in
+		let lst', kc = loop lst c in
+		TModule lst', KStar, kc
 
 and type_adt (name : string) (params : string list) (lst : adt) (c : Context.t) : KindConstraintSet.t * Context.t =
 	let qualified_name = qualify_name name in
@@ -390,7 +427,7 @@ and type_adt (name : string) (params : string list) (lst : adt) (c : Context.t) 
 	let new_tc = Context.add_kind name kind tc in
 	let foldf (rest, ks) (name, lst) =
 		let inner_foldf (rest, ks) t =
-			let k, ks' = get_kind t new_tc in
+			let _, k, ks' = get_kind t new_tc in
 			let new_ks = KindConstraintSet.add (KEquals(k, KStar)) (KindConstraintSet.union ks ks') in
 			TFunction(t, rest), new_ks in
 		let t, ks = List.fold_left inner_foldf (result_t, ks) lst in
@@ -398,10 +435,10 @@ and type_adt (name : string) (params : string list) (lst : adt) (c : Context.t) 
 		Context.add_var name t rest, ks in
 	let tc', new_ks = List.fold_left foldf (tc, kem) lst in
 	(* Include variables from the ADT definition in the new context, but not kind bindings *)
-	let varc, _, _ = tc' in
-	let _, kindc, _ = new_tc in
+	let varc, _, _, _ = tc' in
+	let _, kindc, tss, _ = new_tc in
 	let new_ks = KindConstraintSet.add (KEquals(KVar qualified_name, kind)) new_ks in
-	(new_ks, (varc, kindc, Context.get_loc c))
+	(new_ks, (varc, kindc, tss, Context.get_loc c))
 
 
 (* Handle an optional type (that may or may not be given) plus its kind *)
@@ -409,20 +446,15 @@ let get_optional_type (t : ltype option) (ks : KindConstraintSet.t) (c : Context
 	match t with
 	| None -> Ast.new_typevar(), ks
 	| Some t' ->
-		let k, ks' = get_kind t' c in
+		let t'', k, ks' = get_kind t' c in
 		let new_ks = KindConstraintSet.add (KEquals(k, KStar))
 			(KindConstraintSet.union ks ks') in
-		t', new_ks
+		t'', new_ks
 
 let check_module_type (interface : module_type_entry list) (actual : module_type_entry list) =
 	(* First, create two maps from the actual type, to enable easy lookup
 		while looping over the interface. *)
-	let foldf (tmap, vmap) entry = match entry with
-		| ConcreteType(n, _, _) | AbstractType(n, _) ->
-			(VarMap.add n entry tmap, vmap)
-		| Value(x, _) ->
-			(tmap, VarMap.add x entry vmap) in
-	let tmap, vmap = List.fold_left foldf (VarMap.empty, VarMap.empty) actual in
+	let tmap, vmap = mapify_module_type actual in
 
 	let check_foldf (t, cs) entry = try
 		match entry with
@@ -440,10 +472,9 @@ let check_module_type (interface : module_type_entry list) (actual : module_type
 				let msg = "Interface and implementation do not match: " ^ string_of_module_type_entry entry ^ " and " ^ string_of_module_type_entry e in
 				raise(TypeError msg)
 			| _ -> failwith "impossible")
-		| Value(x, tp) -> (match VarMap.find x vmap with
-			| Value(x', tp') when x = x' ->
-				(entry::t, ConstraintSet.add (Equals(tp, tp')) cs)
-			| _ -> failwith "Impossible")
+		| Value(x, tp) ->
+			let tp' = VarMap.find x vmap in
+			(entry::t, ConstraintSet.add (Equals(tp, tp')) cs)
 	with Not_found ->
 		let text = string_of_module_type_entry entry in
 		let msg = "Module types do not match, cannot find interface member " ^ text ^ " in implementation" in
@@ -593,10 +624,11 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let Type(t1, e1, cs1, ks1) = get_type e c' in
 		Type(t1, In(LetADT(name, params, lst), e1), cs1, KindConstraintSet.union new_ks ks1)
 	| In(TypeSynonym(name, t), e) ->
-		let kind, ks = get_kind t c in
-		let new_tc = Context.add_kind name kind c in
+		let t, kind, ks = get_kind t c in
+		let new_tc = Context.add_kind name kind (Context.add_type_synonym name t c) in
 		let Type(t1, e1, cs1, ks1) = get_type e new_tc in
-		Type(t1, In(TypeSynonym(name, t), e), cs1, KindConstraintSet.union ks ks1)
+		let new_cs = ConstraintSet.add (Equals(Typevar name, t)) cs1 in
+		Type(t1, In(TypeSynonym(name, t), e), new_cs, KindConstraintSet.union ks ks1)
 	| Dummy _ | Error _ -> raise(TypeError("Should not appear here"))
 	| Match(e, lst) ->
 		let Type(t1, e1, cs1, ks1) = get_type e c in
@@ -648,10 +680,11 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 		let rec loop lst c = match lst with
 			| [] -> [], [], em, kem
 			| (TypeSynonym(name, t) as hd)::tl ->
-				let kind, ks' = get_kind t c in
+				let t, kind, ks' = get_kind t c in
 				let new_tc = Context.add_kind name kind c in
 				let rest, m, cs, ks = loop tl new_tc in
-				ConcreteType(name, [], t)::rest, hd::m, cs, (KindConstraintSet.union ks ks')
+				let new_cs = ConstraintSet.add (Equals(Typevar name, t)) cs in
+				ConcreteType(name, [], t)::rest, hd::m, new_cs, (KindConstraintSet.union ks ks')
 			| (LetADT(name, params, lst) as hd)::tl ->
 				let new_ks, c' = type_adt name params lst c in
 				let rest, m, cs, ks = loop tl c' in
@@ -701,10 +734,11 @@ and get_type_let (e : expr) (x : string) (t : ltype option) (c : Context.t) : Co
 	let subst = unify cs1 in
 	let t1' = apply_substitution subst t1 VariableSet.empty in
 	let t1'' = quantify c t1' in
-	let new_tc = Context.add_var x t1'' c in
 	let t', ks' = get_optional_type t ks1 c in
+	let result_t = select_type t' t1'' in
+	let new_tc = Context.add_var x result_t c in
 	let new_cs = ConstraintSet.add (Equals(t', t1'')) cs1 in
-	new_tc, t1'', e1, new_cs, ks'
+	new_tc, result_t, e1, new_cs, ks'
 and get_type_let_rec (e : expr) (x : string) (t : ltype option) (c : Context.t) : Context.t * ltype * expr * ConstraintSet.t * KindConstraintSet.t =
 	let t', ks' = get_optional_type t kem c in
 	let e1_c = Context.add_var x t' c in
@@ -712,10 +746,11 @@ and get_type_let_rec (e : expr) (x : string) (t : ltype option) (c : Context.t) 
 	let subst = unify cs1 in
 	let t1' = apply_substitution subst t1 VariableSet.empty in
 	let t1'' = quantify e1_c t1' in
-	let new_tc = Context.add_var x t1'' c in
+	let result_t = select_type t' t1'' in
+	let new_tc = Context.add_var x result_t c in
 	let ks = KindConstraintSet.union ks' ks1 in
-	let new_cs = ConstraintSet.add (Equals(t', t1')) cs1 in
-	new_tc, t1'', e1, new_cs, ks
+	let new_cs = ConstraintSet.add (Equals(t', t1'')) cs1 in
+	new_tc, result_t, e1, new_cs, ks
 and get_type_open x (c : Context.t) : Context.t =
 	try match Context.find_var x c with
 		| TModule lst ->

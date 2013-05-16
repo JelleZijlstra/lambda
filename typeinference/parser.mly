@@ -6,7 +6,7 @@
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
-%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS
+%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS FORALL
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr program
 %type<Ast.expr> single_expr
@@ -145,7 +145,13 @@ record_list:
 								{ VarMap.add $1 $3 $5 }
 
 type:
-	| product_type ARROW type	{ TFunction($1, $3) }
+	| FORALL IDENTIFIER parameter_list DOT arrow_type
+								{ TForAll($2::$3, $5) }
+	| arrow_type				{ $1 }
+
+arrow_type:
+	| product_type ARROW arrow_type
+								{ TFunction($1, $3) }
 	| product_type				{ $1 }
 
 product_type:
