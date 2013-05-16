@@ -1,0 +1,11 @@
+let uses_both = \x. \y. x + y in
+let uses_neither = \x. \y. 42 in
+
+# will print nothing in CBN and lazy, 4 5 in CBV
+let z = uses_neither (print 4) (print 5) in
+
+# will print 3 once in CBV and lazy, twice in CBN
+let x = print 3 in
+let y = uses_both x x in
+
+y + z

@@ -6,7 +6,7 @@ CAMLCFLAGS= -g
 CAMLOPT=ocamlopt
 CAMLOPTFLAGS=
 
-SOURCES = ast.ml parser.ml lexer.ml util.ml eval.ml compile.ml main.ml
+SOURCES = ast.ml parser.ml lexer.ml util.ml eval.ml lazy.ml compile.ml main.ml
 OBJECTS = $(SOURCES:.ml=.cmo)
 INTERFACES = $(SOURCES:.ml=.mli)
 INTERFACE_OBJECTS = $(SOURCES:.ml=.cmi)
