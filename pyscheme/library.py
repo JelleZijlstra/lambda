@@ -65,6 +65,16 @@ class letm(lib_macro):
 			new_context.add_name(name.name, code.eval(context))
 		return args[1].eval(new_context)
 
+class ifm(lib_macro):
+	def call(self, args, context):
+		self.ensure_args(args, 3)
+		condition = args[0].eval(context)
+		is_true = not (isinstance(condition, ast.literal) and condition.content == False)
+		if is_true:
+			return args[1].eval(context)
+		else:
+			return args[2].eval(context)
+
 class printf(object):
 	def call(self, args):
 		for arg in args:
@@ -76,7 +86,8 @@ lib_macros = {
 	"lambda": lambdam(),
 	"define": definem(),
 	"set!": setm(),
-	"let": letm()
+	"let": letm(),
+	"if": ifm(),
 }
 
 lib_names = {

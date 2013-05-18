@@ -40,6 +40,11 @@ class literal(expr):
 		elif self.tkn == T_COMPLEX:
 			real, imag = self.content
 			string = str(real) + '+' + str(imag) + 'i'
+		elif self.tkn == T_BOOL:
+			if self.content:
+				string = "#t"
+			else:
+				string = "#f"
 		put(string)
 
 	def eval(self, context):
