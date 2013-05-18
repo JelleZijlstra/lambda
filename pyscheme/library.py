@@ -1,11 +1,21 @@
-import ast
 import copy
+import fractions
+import functools
 
-class lib_macro(object):
+import ast
+from lexer import *
+
+class lib_proc(object):
 	def get_name(self):
 		'''Evil, illegal way to extract the current class's name'''
 		return self.__class__.__name__[:-1]
 
+	def ensure_type(self, value, type):
+		if not isinstance(value, type):
+			msg = "%s: wrong type for value (expected %s)" % (self.get_name(), type.__name__)
+			raise(ast.runtime_error(msg))
+
+class lib_macro(lib_proc):
 	def ensure_args(self, args, n):
 		if len(args) != n:
 			msg = "%s: %d arguments provided, but %d were expected" % (self.get_name(), n, len(args))
@@ -14,11 +24,6 @@ class lib_macro(object):
 	def ensure_arg_type(self, args, n, type):
 		if not isinstance(args[n], type):
 			msg = "%s: wrong type for argument %d (expected %s)" % (self.get_name(), n, type.__name__)
-			raise(ast.runtime_error(msg))
-
-	def ensure_type(self, value, type):
-		if not isinstance(value, type):
-			msg = "%s: wrong type for value (expected %s)" % (self.get_name(), type.__name__)
 			raise(ast.runtime_error(msg))
 
 class lambdam(lib_macro):
@@ -75,12 +80,43 @@ class ifm(lib_macro):
 		else:
 			return args[2].eval(context)
 
-class printf(object):
+class lib_function(lib_proc):
+	pass
+
+class printf(lib_function):
 	def call(self, args):
 		for arg in args:
 			arg.pretty_print()
 			print()
 		return ast.nil
+
+def lcm(x, y):
+	return (x * y) / fractions.gcd(x, y)
+
+class plusf(lib_function):
+	def call(self, args):
+		if len(args) == 0:
+			return ast.literal(T_INT, 0)
+		else:
+			def reducef(x, y):
+				self.ensure_type(x, ast.literal)
+				self.ensure_type(y, ast.literal)
+				if x.tkn != y.tkn:
+					raise(runtime_error("+: arguments must have same type"))
+				if x.tkn == T_INT or x.tkn == T_FLOAT:
+					return ast.literal(T_INT, x.content + y.content)
+				elif x.tkn == T_RATIONAL:
+					x1, x2 = x.content
+					y1, y2 = y.content
+					z2 = lcm(x2, y2)
+					z1 = x1 * (z2 / x2) + y1 * (z2 / y2)
+					return ast.literal(T_RATIONAL, (int(z1), int(z2)))
+				elif x.tkn == T_COMPLEX:
+					x1, x2 = x.content
+					y1, y2 = x.content
+					return ast.literal(T_COMPLEX, (x1 + y1, x2 + y2))
+			return functools.reduce(reducef, args)
+
 
 lib_macros = {
 	"lambda": lambdam(),
@@ -91,5 +127,6 @@ lib_macros = {
 }
 
 lib_names = {
-	"print": printf()
+	"print": printf(),
+	"+": plusf()
 }
