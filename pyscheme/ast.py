@@ -62,13 +62,14 @@ class slist(expr):
 			raise runtime_error("Empty list cannot be eval'ed")
 		fst = self.lst[0]
 		if isinstance(fst, name) and context.has_macro(fst.name):
-			code = context.get_macro(fst.name).call(self.lst[1:], context)
-			return code.eval(context)
+			return context.get_macro(fst.name).call(self.lst[1:], context)
 
 		evaled = [elem.eval(context) for elem in self.lst]
 		fn = evaled[0]
 		args = evaled[1:]
 		return fn.call(args)
+
+nil = slist([])
 
 class program(object):
 	def __init__(self, prgrm):

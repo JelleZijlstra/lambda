@@ -1,56 +1,82 @@
 import ast
+import copy
 
-class lambdam(object):
+class lib_macro(object):
+	def get_name(self):
+		'''Evil, illegal way to extract the current class's name'''
+		return self.__class__.__name__[:-1]
+
+	def ensure_args(self, args, n):
+		if len(args) != n:
+			msg = "%s: %d arguments provided, but %d were expected" % (self.get_name(), n, len(args))
+			raise(ast.runtime_error(msg))
+
+	def ensure_arg_type(self, args, n, type):
+		if not isinstance(args[n], type):
+			msg = "%s: wrong type for argument %d (expected %s)" % (self.get_name(), n, type.__name__)
+			raise(ast.runtime_error(msg))
+
+	def ensure_type(self, value, type):
+		if not isinstance(value, type):
+			msg = "%s: wrong type for value (expected %s)" % (self.get_name(), type.__name__)
+			raise(ast.runtime_error(msg))
+
+class lambdam(lib_macro):
 	def call(self, args, context):
-		if len(args) != 2:
-			raise ast.runtime_error("lambda: lambda takes two arguments")
-		params_c = args[0]
+		self.ensure_args(args, 2)
+		self.ensure_arg_type(args, 0, ast.slist)
 		code = args[1]
-		if not isinstance(params_c, ast.slist):
-			raise ast.runtime_error("lambda: lambda arguments must be in list form")
 		params = []
-		for elem in params_c.lst:
-			if not isinstance(elem, ast.name):
-				raise ast.runtime_error("lambda: lambda arguments must be names")
+		for elem in args[0].lst:
+			self.ensure_type(elem, ast.name)
 			params.append(elem.name)
 		return ast.function(params, code, context)
 
-class definem(object):
+class definem(lib_macro):
 	def call(self, args, context):
-		if len(args) != 2:
-			raise ast.runtime_error("define: define takes two arguments")
-		name_c = args[0]
-		if not isinstance(name_c, ast.name):
-			raise ast.runtime_error("define: variable to be defined must be a name")
-		name = name_c.name
+		self.ensure_args(args, 2)
+		self.ensure_arg_type(args, 0, ast.name)
+		name = args[0].name
 		if context.has_name(name):
 			raise ast.runtime_error("define: cannot redefine variable %s" % name)
 		value = args[1].eval(context)
 		context.add_name(name, value)
 		return value
 
-class setm(object):
+class setm(lib_macro):
 	def call(self, args, context):
-		if len(args) != 2:
-			raise ast.runtime_error("set!: set! takes two arguments")
-		name_c = args[0]
-		if not isinstance(name_c, ast.name):
-			raise ast.runtime_error("set!: variable to be set must be a name")
-		name = name_c.name
+		self.ensure_args(args, 2)
+		self.ensure_arg_type(args, 0, ast.name)
+		name = args[0].name
 		value = args[1].eval(context)
 		context.add_name(name, value)
 		return value
+
+class letm(lib_macro):
+	def call(self, args, context):
+		self.ensure_args(args, 2)
+		self.ensure_arg_type(args, 0, ast.slist)
+		new_context = copy.copy(context)
+		for pair in args[0].lst:
+			self.ensure_type(pair, ast.slist)
+			name = pair.lst[0]
+			self.ensure_type(name, ast.name)
+			code = pair.lst[1]
+			new_context.add_name(name.name, code.eval(context))
+		return args[1].eval(new_context)
 
 class printf(object):
 	def call(self, args):
 		for arg in args:
 			arg.pretty_print()
 			print()
+		return ast.nil
 
 lib_macros = {
 	"lambda": lambdam(),
 	"define": definem(),
-	"set!": setm()
+	"set!": setm(),
+	"let": letm()
 }
 
 lib_names = {
