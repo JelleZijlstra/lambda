@@ -15,3 +15,5 @@ parser.output
 parser.hs
 lexer.hs
 hslam
+*.pyc
+__pycache__/*
