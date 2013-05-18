@@ -15,16 +15,18 @@ class lib_proc(object):
 			msg = "%s: wrong type for value (expected %s)" % (self.get_name(), type.__name__)
 			raise(ast.runtime_error(msg))
 
-class lib_macro(lib_proc):
+	def ensure_arg_type(self, args, n, type):
+		if not isinstance(args[n], type):
+			msg = "%s: wrong type for argument %d (expected %s)" % (self.get_name(), n, type.__name__)
+			raise(ast.runtime_error(msg))
+
 	def ensure_args(self, args, n):
 		if len(args) != n:
 			msg = "%s: %d arguments provided, but %d were expected" % (self.get_name(), n, len(args))
 			raise(ast.runtime_error(msg))
 
-	def ensure_arg_type(self, args, n, type):
-		if not isinstance(args[n], type):
-			msg = "%s: wrong type for argument %d (expected %s)" % (self.get_name(), n, type.__name__)
-			raise(ast.runtime_error(msg))
+class lib_macro(lib_proc):
+	pass
 
 class lambdam(lib_macro):
 	def call(self, args, context):
@@ -90,6 +92,28 @@ class printf(lib_function):
 			print()
 		return ast.nil
 
+class carf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		self.ensure_arg_type(args, 0, ast.slist)
+		if len(args[0].lst) == 0:
+			raise(runtime_error("car: empty list"))
+		return args[0].lst[0]
+
+class cdrf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		self.ensure_arg_type(args, 0, ast.slist)
+		if len(args[0].lst) == 0:
+			raise(runtime_error("cdr: empty list"))
+		return ast.slist(args[0].lst[1:])
+
+class consf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 2)
+		self.ensure_arg_type(args, 1, ast.slist)
+		return ast.slist([args[0]] + args[1].lst)
+
 def lcm(x, y):
 	return (x * y) / fractions.gcd(x, y)
 
@@ -128,5 +152,8 @@ lib_macros = {
 
 lib_names = {
 	"print": printf(),
-	"+": plusf()
+	"+": plusf(),
+	"cons": consf(),
+	"car": carf(),
+	"cdr": cdrf()
 }
