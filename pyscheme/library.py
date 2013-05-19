@@ -154,6 +154,13 @@ class plusf(lib_function):
 					return ast.literal(T_COMPLEX, (x1 + y1, x2 + y2))
 			return functools.reduce(reducef, args)
 
+class appendf(lib_function):
+	def call(self, args):
+		def reducef(x, y):
+			self.ensure_type(y, ast.slist)
+			return x + y.lst
+		return ast.slist(functools.reduce(reducef, args, []))
+
 lib_macros = {
 	"lambda": lambdam(),
 	"define": definem(),
@@ -169,4 +176,5 @@ lib_names = {
 	"cons": consf(),
 	"car": carf(),
 	"cdr": cdrf(),
+	"append": appendf(),
 }
