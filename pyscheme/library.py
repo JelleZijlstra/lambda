@@ -22,11 +22,15 @@ class lib_proc(object):
 
 	def ensure_args(self, args, n):
 		if len(args) != n:
-			msg = "%s: %d arguments provided, but %d were expected" % (self.get_name(), n, len(args))
+			msg = "%s: %d arguments provided, but %d were expected" % (self.get_name(), len(args), n)
 			raise(ast.runtime_error(msg))
 
+	def eval(self, context):
+		return self
+
 class lib_macro(lib_proc):
-	pass
+	def pretty_print(self):
+		print("#{macro}", end="")
 
 class lambdam(lib_macro):
 	def call(self, args, context):
@@ -82,8 +86,14 @@ class ifm(lib_macro):
 		else:
 			return args[2].eval(context)
 
+class evalm(lib_macro):
+	def call(self, args, context):
+		self.ensure_args(args, 1)
+		return args[0].eval(context).eval(context)
+
 class lib_function(lib_proc):
-	pass
+	def pretty_print(self):
+		print("#{procedure}", end="")
 
 class printf(lib_function):
 	def call(self, args):
@@ -141,13 +151,13 @@ class plusf(lib_function):
 					return ast.literal(T_COMPLEX, (x1 + y1, x2 + y2))
 			return functools.reduce(reducef, args)
 
-
 lib_macros = {
 	"lambda": lambdam(),
 	"define": definem(),
 	"set!": setm(),
 	"let": letm(),
 	"if": ifm(),
+	"eval": evalm(),
 }
 
 lib_names = {
@@ -155,5 +165,5 @@ lib_names = {
 	"+": plusf(),
 	"cons": consf(),
 	"car": carf(),
-	"cdr": cdrf()
+	"cdr": cdrf(),
 }
