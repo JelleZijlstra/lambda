@@ -1,6 +1,9 @@
 import ast
 import copy
 import library
+import parser
+
+LIBRARY_FILE = "library.scm"
 
 class context(object):
 	def __init__(self, names, macros):
@@ -29,5 +32,12 @@ class context(object):
 	def has_macro(self, name):
 		return name in self.macros
 
+	@staticmethod
+	def new_context():
+		ctxt = context(library.lib_names, library.lib_macros)
+		lib = parser.parse(open(LIBRARY_FILE).read())
+		lib.eval(ctxt)
+		return ctxt
+
 def eval(tree):
-	tree.eval(context(library.lib_names, library.lib_macros))
+	tree.eval(context.new_context())
