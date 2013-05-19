@@ -94,6 +94,36 @@ class evalm(lib_macro):
 		self.ensure_args(args, 1)
 		return args[0].eval(context).eval(context)
 
+class user_defined_macro(lib_macro):
+	def __init__(self, params, body, define_context):
+		super().__init__()
+		self.params = params
+		self.body = body
+		self.define_context = define_context
+
+	def call(self, args, context):
+		new_context = copy.copy(self.define_context)
+		new_context.set_meval_context(context)
+		ast.set_params(self.params, args, new_context)
+		return self.body.eval(new_context)
+
+class defmacrom(lib_macro):
+	def call(self, args, context):
+		self.ensure_args(args, 3)
+		self.ensure_arg_type(args, 0, ast.name)
+		name = args[0].name
+		self.ensure_arg_type(args, 1, ast.slist)
+		params = args[1].lst
+		body = args[2]
+		macro = user_defined_macro(params, body, context)
+		context.add_macro(name, macro)
+		return macro
+
+class mevalm(lib_macro):
+	def call(self, args, context):
+		self.ensure_args(args, 1)
+		return args[0].eval(context.get_meval_context())
+
 class lib_function(lib_proc):
 	def pretty_print(self):
 		print("#{procedure}", end="")
@@ -161,6 +191,22 @@ class appendf(lib_function):
 			return x + y.lst
 		return ast.slist(functools.reduce(reducef, args, []))
 
+class gensymf(lib_function):
+	counter = 0
+	def call(self, args):
+		name = "var" + counter
+		counter = counter + 1
+		return ast.name(name)
+
+class nullf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		self.ensure_arg_type(args, 0, ast.slist)
+		if len(args[0].lst) == 0:
+			return ast.true
+		else:
+			return ast.false
+
 lib_macros = {
 	"lambda": lambdam(),
 	"define": definem(),
@@ -168,6 +214,8 @@ lib_macros = {
 	"let": letm(),
 	"if": ifm(),
 	"eval": evalm(),
+	"defmacro": defmacrom(),
+	"meval": mevalm(),
 }
 
 lib_names = {
@@ -177,4 +225,5 @@ lib_names = {
 	"car": carf(),
 	"cdr": cdrf(),
 	"append": appendf(),
+	"null?": nullf(),
 }

@@ -6,13 +6,14 @@ import parser
 LIBRARY_FILE = "library.scm"
 
 class context(object):
-	def __init__(self, names, macros):
+	def __init__(self, names, macros, meval_context = None):
 		super().__init__()
 		self.names = copy.copy(names)
 		self.macros = copy.copy(macros)
+		self.meval_context = meval_context
 
 	def copy(self):
-		return context(self.names, self.macros)
+		return context(self.names, self.macros, meval_context=self.meval_context)
 
 	def get_name(self, name):
 		return self.names[name]
@@ -31,6 +32,12 @@ class context(object):
 
 	def has_macro(self, name):
 		return name in self.macros
+
+	def set_meval_context(self, ctxt):
+		self.meval_context = ctxt
+
+	def get_meval_context(self):
+		return self.meval_context
 
 	@staticmethod
 	def new_context():

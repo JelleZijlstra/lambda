@@ -97,10 +97,38 @@ class name(expr):
 		put(self.name)
 
 	def eval(self, context):
+		if context.has_macro(self.name):
+			return captured_macro(context.get_macro(self.name), context)
 		try:
 			return context.get_name(self.name)
 		except KeyError:
 			raise(runtime_error("Unbound variable: %s" % self.name))
+
+class captured_macro(expr):
+	def __init__(self, macro, context):
+		super().__init__()
+		self.macro = macro
+		self.context = context
+
+	def call(self, args):
+		return self.macro.call(args, self.context)
+
+	def eval(self, context):
+		return self
+
+	def pretty_print(self):
+		self.macro.pretty_print()
+
+def set_params(params, args, context):
+	for index, name in enumerate(params):
+		if isinstance(name, dotted_name):
+			value = slist(args[index:])
+			context.add_name(name.name, value)
+			break
+		try:
+			context.add_name(name, args[index])
+		except IndexError:
+			raise runtime_error("Invalid number of arguments")
 
 class function(expr):
 	def __init__(self, params, code, context):
@@ -111,14 +139,7 @@ class function(expr):
 
 	def call(self, args):
 		new_context = copy.copy(self.context)
-		for index, name in enumerate(self.params):
-			if isinstance(name, dotted_name):
-				new_context.add_name(name.name, slist(args[index:]))
-				break
-			try:
-				new_context.add_name(name, args[index])
-			except IndexError:
-				raise runtime_error("Invalid number of arguments")
+		set_params(self.params, args, new_context)
 		return self.code.eval(new_context)
 
 	def eval(self, context):
