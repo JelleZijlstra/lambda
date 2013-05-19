@@ -163,3 +163,8 @@ nil = slist([])
 true = literal(T_BOOL, True)
 false = literal(T_BOOL, False)
 
+def scm_bool(b):
+	if b:
+		return true
+	else:
+		return false

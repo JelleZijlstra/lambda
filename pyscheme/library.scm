@@ -13,3 +13,10 @@
 		(if (not (meval (car xs)))
 			#f
 			(apply and (cdr xs)))))
+
+(defmacro or (. xs)
+	(if (null? xs)
+		#f
+		(if (meval (car xs))
+			#t
+			(apply or (cdr xs)))))
