@@ -40,7 +40,7 @@ def tokenize(string):
 		elif is_whitespace(c):
 			continue
 		# single-character tokens
-		elif c == '(' or c == ')' or c == '\'':
+		elif c == '(' or c == ')' or c == '\'' or c == '.':
 			yield c, None
 		# strings
 		elif c == '"':

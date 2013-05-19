@@ -74,8 +74,6 @@ class slist(expr):
 		args = evaled[1:]
 		return fn.call(args)
 
-nil = slist([])
-
 class program(object):
 	def __init__(self, prgrm):
 		super().__init__()
@@ -114,6 +112,9 @@ class function(expr):
 	def call(self, args):
 		new_context = copy.copy(self.context)
 		for index, name in enumerate(self.params):
+			if isinstance(name, dotted_name):
+				new_context.add_name(name.name, slist(args[index:]))
+				break
 			try:
 				new_context.add_name(name, args[index])
 			except IndexError:
@@ -125,3 +126,19 @@ class function(expr):
 
 	def pretty_print(self):
 		put("#{procedure}")
+
+class dotted_name(expr):
+	def __init__(self, name):
+		self.name = name.name
+
+	def call(self, args):
+		raise runtime_error("cannot call dotted_name")
+
+	def pretty_print(self):
+		put(" . %s" % self.name)
+
+# common objects
+nil = slist([])
+true = literal(T_BOOL, True)
+false = literal(T_BOOL, False)
+

@@ -25,6 +25,19 @@ def do_parse_list(it):
 		if c == ')':
 			it.next()
 			break
+		elif c == '.':
+			it.next()
+			rest = do_parse(it)
+			if isinstance(rest, slist):
+				lst = lst + rest.lst
+			elif isinstance(rest, name):
+				lst.append(dotted_name(rest))
+			else:
+				raise parse_error("Unexpected expression following dot")
+			n, cnt = it.next()
+			if n != ')':
+				raise parse_error("Expected ) following dot")
+			break
 		elif c == T_EOF:
 			raise parse_error("Unexpected EOF within list context")
 		else:

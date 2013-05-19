@@ -39,6 +39,9 @@ class lambdam(lib_macro):
 		code = args[1]
 		params = []
 		for elem in args[0].lst:
+			if isinstance(elem, ast.dotted_name):
+				params.append(elem)
+				break
 			self.ensure_type(elem, ast.name)
 			params.append(elem.name)
 		return ast.function(params, code, context)
