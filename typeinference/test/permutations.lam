@@ -1,0 +1,44 @@
+data list a = Nil | Cons a (list a)
+
+let rec map = \f. \l. match l with {
+    Nil -> Nil
+    | Cons hd tl -> Cons (f hd) (map f tl)
+}
+
+let rec reduce = \b. \f. \l. match l with {
+    Nil -> b
+    | Cons hd tl -> f hd (reduce b f tl)
+}
+
+let rec revappend = \l1. \l2. match l1 with {
+    Nil -> l2
+    | Cons hd tl -> revappend tl (Cons hd l2)
+}
+
+let flatten = reduce Nil revappend
+
+let rec intersperse = \elt. \lst. Cons (Cons elt lst) (match lst with {
+    Nil -> Nil
+    | Cons hd tl -> map (Cons hd) (intersperse elt tl)
+})
+
+let rec permutations = \lst. match lst with {
+    Nil -> Cons Nil Nil
+    | Cons hd tl -> flatten (map (intersperse hd) (permutations tl))
+}
+
+let rec print_list = \lst. match lst with {
+    Nil -> Nil
+    | Cons hd tl -> (print hd; print_list tl)
+}
+
+let rec print_perms = \perms. match perms with {
+    Nil -> ()
+    | Cons hd tl -> (print_list hd; print 1000000; print_perms tl)
+}
+
+let rec make_list = \n. if n = 0 then Nil else Cons n (make_list (n - 1))
+
+;;
+
+print_perms (permutations (make_list 4))
