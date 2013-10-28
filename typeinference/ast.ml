@@ -19,9 +19,10 @@ module VarMap = Map.Make(struct
 end)
 
 type ltype =
-	| TInt
+	TInt
 	| TBool
 	| TUnit
+	| TString
 	| TFunction of ltype * ltype
 	| Typevar of string
 	| TypeWithLabel of string * (string * ltype) list
@@ -47,6 +48,7 @@ type expr =
 	| In of in_expr * expr
 	| Int of int
 	| Bool of bool
+	| String of string
 	| Binop of binop * expr * expr
 	| Boolbinop of boolbinop * expr * expr
 	| If of expr * expr * expr
@@ -76,12 +78,14 @@ and pattern =
 	| PApplication of pattern * pattern
 	| PInt of int
 	| PBool of bool
+	| PString of string
 	| PPair of pattern * pattern
 	| PGuarded of pattern * expr
 	| PAs of pattern * string
 and value =
 	| VInt of int
 	| VBool of bool
+	| VString of string
 	| VUnit
 	| VAbstraction of string * value VarMap.t * expr
 	| VReference of value ref
@@ -114,9 +118,12 @@ let join glue =
 
 let ljoin glue lst = join "" (List.map (fun e -> glue ^ e) lst)
 
+let quote_string s = "\"" ^ s ^ "\""
+
 let rec string_of_type t = match t with
 	| TInt -> "int"
 	| TBool -> "bool"
+	| TString -> "string"
 	| TUnit -> "unit"
 	| TRef t -> "ref " ^ string_of_type t
 	| TFunction(TFunction(_, _) as f, t) ->
@@ -177,6 +184,7 @@ let rec string_of_expr e =
 	| Var x -> x
 	| Unit -> "()"
 	| Int i -> string_of_int i
+	| String s -> quote_string s
 	| Bool true -> "true"
 	| Bool false -> "false"
 	| Abstraction(x, Some t, e1) -> "\\" ^ x ^ " : " ^ string_of_type t ^ ". " ^ string_of_expr e1
@@ -238,6 +246,7 @@ and string_of_pattern p = match p with
 	| PVariable v | PConstructor v -> v
 	| PApplication(p1, p2) -> string_of_pattern p1 ^ " " ^ string_of_pattern p2
 	| PInt n -> string_of_int n
+	| PString s -> quote_string s
 	| PBool true -> "true"
 	| PBool false -> "false"
 	| PPair(p1, p2) -> "(" ^ string_of_pattern p1 ^ ", " ^ string_of_pattern p2 ^ ")"
@@ -248,6 +257,7 @@ and string_of_value e =
 	match e with
 	| VUnit -> "()"
 	| VInt i -> string_of_int i
+	| VString s -> quote_string s
 	| VBool true -> "true"
 	| VBool false -> "false"
 	| VAbstraction(x, _, e1) -> "\\" ^ x ^ ". " ^ string_of_expr e1

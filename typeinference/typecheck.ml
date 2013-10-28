@@ -60,7 +60,7 @@ type type_cs = Type of ltype * expr * ConstraintSet.t * KindConstraintSet.t
 
 let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| Typevar t' -> VariableSet.singleton t'
-	| TInt | TBool | TUnit -> VariableSet.empty
+	| TInt | TBool | TUnit | TString -> VariableSet.empty
 	| TProduct(t1, t2)
 	| TSum(t1, t2)
 	| TParameterized(t1, t2)
@@ -91,7 +91,7 @@ let rec replace_in_type typevar new_type t =
 	match t with
 	| Typevar t' when t' = typevar -> new_type
 	| TypeWithLabel(n, lst) when n = typevar -> new_type
-	| Typevar _ | TInt | TBool | TUnit -> t
+	| Typevar _ | TInt | TBool | TUnit | TString -> t
 	| TFunction(t1, t2) -> TFunction(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| TProduct(t1, t2) -> TProduct(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| TSum(t1, t2) -> TSum(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
@@ -184,7 +184,7 @@ let replace_kind kvar new_kind ks =
 
 let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| Typevar t' -> t = t'
-	| TInt | TBool | TUnit -> false
+	| TInt | TBool | TUnit | TString -> false
 	| TProduct(t1, t2)
 	| TSum(t1, t2)
 	| TParameterized(t1, t2)
@@ -310,7 +310,7 @@ let rec unify_kinds (ks : KindConstraintSet.t) : ksubstitution =
 
 let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : ltype =
 	match t with
-	| TInt | TBool | TUnit -> t
+	| TInt | TBool | TUnit | TString -> t
 	| TRef t' -> TRef(apply_substitution s t' b)
 	| TFunction(t1, t2) -> TFunction(apply_substitution s t1 b, apply_substitution s t2 b)
 	| TSum(t1, t2) -> TSum(apply_substitution s t1 b, apply_substitution s t2 b)
@@ -346,7 +346,7 @@ let rec get_kind (t : ltype) (c : Context.t) : ltype * kind * KindConstraintSet.
 		let kc = add (KEquals(k1, KStar)) (add (KEquals(k2, KStar)) (union kc1 kc2)) in
 		t1, t2, kc in
 	match t with
-	| TInt | TBool | TUnit -> t, KStar, kem
+	| TInt | TBool | TUnit | TString -> t, KStar, kem
 	| TProduct(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TProduct(t1, t2), KStar, kc
 	| TSum(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TSum(t1, t2), KStar, kc
 	| TFunction(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TFunction(t1, t2), KStar, kc
@@ -487,6 +487,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 	| Int _ -> Type(TInt, e, em, kem)
 	| Bool _ -> Type(TBool, e, em, kem)
 	| Unit -> Type(TUnit, e, em, kem)
+	| String _ -> Type(TString, e, em, kem)
 	| Var x ->
 		(try Type(instantiate (Context.find_var x c), e, em, kem)
 			with Not_found -> raise (TypeError("Unbound variable: " ^ x)))
@@ -640,6 +641,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 				| PVariable x -> (p, [(x, t)], cs, kem)
 				| PInt _ -> (p, [], ConstraintSet.add (Equals(t, TInt)) cs, kem)
 				| PBool _ -> (p, [], ConstraintSet.add (Equals(t, TBool)) cs, kem)
+				| PString _ -> (p, [], ConstraintSet.add (Equals(t, TString)) cs, kem)
 				| PPair(p1, p2) ->
 					let t1 = Ast.new_typevar() in
 					let t2 = Ast.new_typevar() in

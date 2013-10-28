@@ -16,9 +16,10 @@ type unop =
 module VarMap : Map.S with type key = string
 
 type ltype =
-	| TInt
+	TInt
 	| TBool
 	| TUnit
+	| TString
 	| TFunction of ltype * ltype
 	| Typevar of string
 	| TypeWithLabel of string * (string * ltype) list
@@ -44,6 +45,7 @@ type expr =
 	| In of in_expr * expr
 	| Int of int
 	| Bool of bool
+	| String of string
 	| Binop of binop * expr * expr
 	| Boolbinop of boolbinop * expr * expr
 	| If of expr * expr * expr
@@ -73,12 +75,14 @@ and pattern =
 	| PApplication of pattern * pattern
 	| PInt of int
 	| PBool of bool
+	| PString of string
 	| PPair of pattern * pattern
 	| PGuarded of pattern * expr
 	| PAs of pattern * string
 and value =
 	| VInt of int
 	| VBool of bool
+	| VString of string
 	| VUnit
 	| VAbstraction of string * value VarMap.t * expr
 	| VReference of value ref

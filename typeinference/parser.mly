@@ -6,7 +6,7 @@
 %token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
-%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS FORALL
+%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS FORALL STRING
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr program
 %type<Ast.expr> single_expr
@@ -14,7 +14,7 @@
 %type<Ast.adt> adt_list
 %type<Ast.pattern> pattern
 %type<(Ast.pattern * Ast.expr) list> pattern_list
-%type<string> IDENTIFIER CONSTRUCTOR
+%type<string> IDENTIFIER CONSTRUCTOR STRING
 %type<int> INTEGER
 %type<Ast.ltype> type
 %type<bool> BOOLEAN
@@ -115,6 +115,7 @@ simple_expr:
 	| CONSTRUCTOR				{ Constructor($1) }
 	| INTEGER					{ Int($1) }
 	| BOOLEAN					{ Bool($1) }
+	| STRING					{ String($1) }
 	| LPAREN expression COMMA expression RPAREN
 								{ Pair($2, $4) }
 	| LPAREN RPAREN				{ Unit }

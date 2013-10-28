@@ -17,7 +17,7 @@ let create_new_var : unit -> string =
 type desugar_ctxt = expr VarMap.t
 
 let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
-	| Var _ | Int _ | Bool _ | Unit | Error _ -> e
+	| Var _ | Int _ | Bool _ | Unit | Error _ | String _ -> e
 	| Application(e1, e2) -> Application(desugar e1 vm, desugar e2 vm)
 	| Abstraction(arg, t, body) -> Abstraction(arg, t, desugar body vm)
 	| Binop(op, e1, e2) -> Binop(op, desugar e1 vm, desugar e2 vm)
@@ -50,6 +50,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 			let rec compile_pattern p e cont = match p with
 			| PInt n -> If(Boolbinop(Equals, Int n, e), Injection(true, cont), Injection(false, Unit))
 			| PBool b -> If(Boolbinop(Equals, Bool b, e), Injection(true, cont), Injection(false, Unit))
+			| PString s -> If(Boolbinop(Equals, String s, e), Injection(true, cont), Injection(false, Unit))
 			| PAnything -> Injection(true, cont)
 			| PVariable x -> Injection(true, In(Let(x, None, e), cont))
 			| PApplication(p1, p2)
@@ -116,6 +117,7 @@ let rec compile_rec e = match e with
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ "(" ^ compile_rec e2 ^ "))"
 	| Abstraction(arg, _, body) -> "(function(" ^ translate_var arg ^ ") {return (" ^ compile_rec body ^ ");})"
 	| Int n -> string_of_int n
+	| String s -> "\"" ^ s ^ "\""
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_binop op ^ compile_rec e2 ^ ")"
 	| Boolbinop(Equals, e1, e2) -> "(" ^ compile_rec e1 ^ " == " ^ compile_rec e2 ^ ")"
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
@@ -169,6 +171,7 @@ let rec compile_rec e = match e with
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(fun " ^ translate_var arg ^ " -> " ^ compile_rec body ^ ")"
 	| Int n -> string_of_int n
+	| String s -> "\"" ^ s ^ "\""
 	| Bool true -> "true"
 	| Bool false -> "false"
 	| Unit -> "()"
@@ -211,6 +214,7 @@ let rec compile_rec e = match e with
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(" ^ translate_var arg ^ " => (" ^ compile_rec body ^ "))"
 	| Int n -> string_of_int n
+	| String s -> "\"" ^ s ^ "\""
 	| Bool true -> "true"
 	| Bool false -> "false"
 	| Unit -> "()"

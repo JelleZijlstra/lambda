@@ -23,7 +23,7 @@ let rec exists_in_pattern var p = match p with
 	| PPair(p1, p2) -> exists_in_pattern var p1 || exists_in_pattern var p2
 	| PGuarded(p, e) -> exists_in_pattern var p
 	| PAs(p, x) -> exists_in_pattern var p || x = var
-	| PVariable _ | PConstructor _ | PAnything | PBool _ | PInt _ -> false
+	| PVariable _ | PConstructor _ | PAnything | PBool _ | PInt _ | PString _ -> false
 
 type bound_vars = value VarMap.t
 
@@ -36,6 +36,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 	| Error e -> VError e
 	| Int n -> VInt n
 	| Bool b -> VBool b
+	| String s -> VString s
 	| Unit -> VUnit
 	| Binop(op, e1, e2) ->
 		let e1' = eval' e1 s in
@@ -120,6 +121,9 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 				| _ -> None)
 			| PBool b -> (match e with
 				| VBool b' when b = b' -> Some []
+				| _ -> None)
+			| PString s -> (match e with
+				| VString s' when s = s' -> Some []
 				| _ -> None)
 			| PPair(p1, p2) -> (match e with
 				| VPair(e1, e2) -> (match eval_pattern p1 e1, eval_pattern p2 e2 with
