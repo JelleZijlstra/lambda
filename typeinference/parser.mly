@@ -85,6 +85,8 @@ in_expr:
 									let value, t = typed_desugar_let $4 $8 $6 in
 									LetRec($3, Some t, value)
 								}
+	| DATA IDENTIFIER parameter_list
+								{ LetADT($2, $3, [])}
 	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
 								{ LetADT($2, $3, $5::$6) }
 	| TYPE IDENTIFIER EQUALS type
@@ -207,6 +209,8 @@ module_type_body:
 								{ $1::$3 }
 
 module_type_entry:
+	| DATA IDENTIFIER parameter_list
+								{ ConcreteType($2, $3, TADT [])}
 	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
 								{ ConcreteType($2, $3, TADT($5::$6)) }
 	| TYPE IDENTIFIER parameter_list
