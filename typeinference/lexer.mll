@@ -27,6 +27,8 @@ rule token = parse
 		{ BOOL }
 | "unit"
 		{ UNIT }
+| "string"
+		{ STRING_T }
 | "->"	{ ARROW }
 | ":"	{ COLON }
 | "fix"	{ FIX }

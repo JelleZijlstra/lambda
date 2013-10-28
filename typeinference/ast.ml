@@ -22,6 +22,7 @@ type ltype =
 	| TString
 	| TFunction of ltype * ltype
 	| Typevar of string
+	| TBoundTypevar of ltype
 	| TypeWithLabel of string * (string * ltype) list
 	| TProduct of ltype * ltype
 	| TSum of ltype * ltype
@@ -128,6 +129,7 @@ let rec string_of_type t = match t with
 		"(" ^ string_of_type f ^ ") -> " ^ string_of_type t
 	| TFunction(a, b) -> string_of_type a ^ " -> " ^ string_of_type b
 	| Typevar t -> "'" ^ t
+	| TBoundTypevar t -> string_of_type t
 	| TypeWithLabel(t, lst) -> "(" ^ t ^ " with "
 		^ join ", " (List.map (fun (l, t) -> l ^ " : " ^ string_of_type t) lst) ^ ")"
 	| TProduct(a, b) -> "(" ^ string_of_type a ^ " * " ^ string_of_type b ^ ")"

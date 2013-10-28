@@ -83,6 +83,7 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 				VariableSet.remove n (VariableSet.union t_vars rest)
 			| Value(n, t) -> VariableSet.union (free_variables t) rest in
 		List.fold_right foldf lst VariableSet.empty
+	| TBoundTypevar _ -> failwith "impossible"
 
 let free_variables_context (c : Context.t) =
 	Context.fold_vars (fun _ t a -> VariableSet.union (free_variables t) a) VariableSet.empty c
@@ -115,6 +116,7 @@ let rec replace_in_type typevar new_type t =
 			| AbstractType(n, params)::tl -> AbstractType(n, params)::loop tl
 			| Value(n, t)::tl -> Value(n, replace_in_type typevar new_type t)::loop tl in
 		TModule(loop lst)
+	| TBoundTypevar _ -> failwith "impossible"
 
 let rec replace_in_kind (kv : string) (new_kind : kind) (k : kind) = match k with
 	| KVar x when kv = x -> new_kind
@@ -203,6 +205,7 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 			| ConcreteType(_, _, t')::tl -> is_free_variable t t' || loop tl
 			| AbstractType(_, _)::tl -> loop tl in
 		loop lst
+	| TBoundTypevar _ -> failwith "impossible"
 
 let rec is_free_kvar (t : string) (k : kind) = match k with
 	| KVar x -> t = x
@@ -336,6 +339,7 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 				ConcreteType(n, params, apply_substitution s t new_b)::loop tl new_b
 			| Value(n, t)::tl -> Value(n, apply_substitution s t b)::loop tl b in
 		TModule(loop lst b)
+	| TBoundTypevar _ -> failwith "impossible"
 
 let rec get_kind (t : ltype) (c : Context.t) : ltype * kind * KindConstraintSet.t =
 	let add = KindConstraintSet.add in
@@ -362,6 +366,8 @@ let rec get_kind (t : ltype) (c : Context.t) : ltype * kind * KindConstraintSet.
 				| None -> Typevar tv in
 			t, k, kem
 		with Not_found -> raise(TypeError("Unbound type variable: " ^ tv)))
+	| TBoundTypevar (Typevar tv) -> Typevar tv, KStar, kem
+	| TBoundTypevar _ -> raise(TypeError("Invalid use of TBoundTypevar"))
 	| TypeWithLabel(n, lst) ->
 		let foldf (l, t) (lst, rest) =
 			let t, k, kc = get_kind t c in

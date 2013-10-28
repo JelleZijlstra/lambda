@@ -19,6 +19,7 @@ type ltype =
 	| TString
 	| TFunction of ltype * ltype
 	| Typevar of string
+	| TBoundTypevar of ltype
 	| TypeWithLabel of string * (string * ltype) list
 	| TProduct of ltype * ltype
 	| TSum of ltype * ltype
