@@ -10,9 +10,6 @@ type boolbinop =
 	| Less
 	| Greater
 
-type unop =
-	Print
-
 module VarMap : Map.S with type key = string
 
 type ltype =
@@ -49,7 +46,6 @@ type expr =
 	| Binop of binop * expr * expr
 	| Boolbinop of boolbinop * expr * expr
 	| If of expr * expr * expr
-	| Unop of unop * expr
 	| Fix of expr
 	| Pair of expr * expr
 	| Projection of bool * expr
@@ -121,10 +117,6 @@ val string_of_bool_binop : boolbinop -> string
 val f_of_bool_binop : boolbinop -> int -> int -> bool
 
 val string_of_binop : binop -> string
-
-val f_of_unop : unop -> int -> int
-
-val string_of_unop : unop -> string
 
 val string_of_expr : expr -> string
 

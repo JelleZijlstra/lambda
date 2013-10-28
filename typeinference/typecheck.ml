@@ -513,9 +513,6 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 			ConstraintSet.add (Equals(t1, TInt))
 			(ConstraintSet.add (Equals(t2, TInt))
 				(ConstraintSet.union cs1 cs2)), KindConstraintSet.union ks1 ks2)
-	| Unop(op, e) ->
-		let Type(t, e, cs, ks) = get_type e c in
-		Type(TInt, Unop(op, e), ConstraintSet.add (Equals(t, TInt)) cs, ks)
 	| Application(e1, e2) ->
 		let Type(t1, e1, cs1, ks1) = get_type e1 c in
 		let Type(t2, e2, cs2, ks2) = get_type e2 c in

@@ -10,9 +10,6 @@ type boolbinop =
 	| Less
 	| Greater
 
-type unop =
-	Print
-
 module VarMap = Map.Make(struct
 	type t = string
 	let compare = compare
@@ -52,7 +49,6 @@ type expr =
 	| Binop of binop * expr * expr
 	| Boolbinop of boolbinop * expr * expr
 	| If of expr * expr * expr
-	| Unop of unop * expr
 	| Fix of expr
 	| Pair of expr * expr
 	| Projection of bool * expr
@@ -175,12 +171,6 @@ let f_of_bool_binop b = match b with
 	| Less -> (<)
 	| Greater -> (>)
 
-let f_of_unop op = match op with
-	| Print -> (fun x -> Printf.printf "%d\n" x; x)
-
-let string_of_unop op = match op with
-	| Print -> "print"
-
 let rec string_of_expr e =
 	match e with
 	| Var x -> x
@@ -196,7 +186,6 @@ let rec string_of_expr e =
 	| Application(e1, e2) -> string_of_expr e1 ^ " " ^ string_of_expr e2
 	| In(e, e2) -> string_of_in_expr e ^ " in " ^ string_of_expr e2
 	| Binop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop op ^ " " ^ string_of_expr e2
-	| Unop(op, e) -> string_of_unop op ^ " " ^ string_of_expr e
 	| Fix e -> "fix " ^ string_of_expr e
 	| If(e1, e2, e3) -> "if " ^ string_of_expr e1 ^ " then " ^ string_of_expr e2 ^ " else " ^ string_of_expr e3
 	| Boolbinop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_bool_binop op ^ " " ^ string_of_expr e2

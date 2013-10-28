@@ -52,11 +52,6 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 		| VInt n1, VInt n2 -> VBool(f_of_bool_binop op n1 n2)
 		| VInt _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_value e2')
 		| _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_value e1'))
-	| Unop(op, e) ->
-		let e' = eval' e s in
-		(match e' with
-		| VInt n -> VInt(f_of_unop op n)
-		| _ -> failwith("Invalid operand to unary expression: " ^ string_of_value e'))
 	| Application(e1, e2) ->
 		let e1' = eval' e1 s in
 		let e2' = eval' e2 s in

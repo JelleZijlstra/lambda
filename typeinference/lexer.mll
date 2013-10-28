@@ -29,8 +29,6 @@ rule token = parse
 		{ UNIT }
 | "->"	{ ARROW }
 | ":"	{ COLON }
-| "print"
-		{ PRINT }
 | "fix"	{ FIX }
 | "rec"	{ REC }
 | "true"
