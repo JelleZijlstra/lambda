@@ -94,6 +94,7 @@ and value =
 	| VError of string
 	| VDummy of expr * value VarMap.t
 	| VModule of module_type_entry list * value VarMap.t
+	| VBuiltin of builtin_function
 and in_expr =
 	| Let of string * ltype option * expr
 	| LetRec of string * ltype option * expr
@@ -102,6 +103,7 @@ and in_expr =
 	| SingleExpression of expr
 	| Open of string
 	| Import of string
+and builtin_function = value -> value
 
 type kind =
 	| KStar

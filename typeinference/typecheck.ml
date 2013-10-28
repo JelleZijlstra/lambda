@@ -777,8 +777,13 @@ and get_type_import (m : string) (c : Context.t) =
 	let tc, t, e, cs, ks = get_type_let com m None (Context.set_loc new_loc c) in
 	Let(m, Some t, e), tc, cs, ks
 
+let initial_context loc =
+	let builtins = Builtin.builtin_types in
+	let c = Context.empty loc in
+	VarMap.fold (fun k t rest -> Context.add_var k t rest) builtins c
+
 let typecheck e verbose loc =
-	try let Type(t, e', cs, ks) = get_type e (Context.empty loc) in
+	try let Type(t, e', cs, ks) = get_type e (initial_context loc) in
 		(try
 			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
 				Printf.printf "Constraints:\n%s\n" (print_cs cs);

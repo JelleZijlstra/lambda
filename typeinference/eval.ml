@@ -64,6 +64,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 		| VAbstraction(arg, s, body) ->
 			eval' body (VarMap.add arg e2' s)
 		| VConstructor _ | VADTInstance(_, _) -> VADTInstance(e1', e2')
+		| VBuiltin b -> b e2'
 		| _ -> failwith "This expression is not a function; it cannot be applied")
 	| Fix(Abstraction(arg, _, body)) ->
 		eval' body (VarMap.add arg (VDummy(e, s)) s)
@@ -184,4 +185,5 @@ and do_open m s = match VarMap.find m s with
 		VarMap.fold VarMap.add lst s
 	| _ -> failwith "Invalid open"
 
-let eval e = eval' e VarMap.empty
+let eval e =
+	eval' e (VarMap.map (fun b -> VBuiltin b) Builtin.builtin_values)

@@ -97,6 +97,7 @@ and value =
 	| VError of string
 	| VDummy of expr * value VarMap.t
 	| VModule of module_type_entry list * value VarMap.t
+	| VBuiltin of builtin_function
 and in_expr =
 	| Let of string * ltype option * expr
 	| LetRec of string * ltype option * expr
@@ -105,6 +106,7 @@ and in_expr =
 	| SingleExpression of expr
 	| Open of string
 	| Import of string
+and builtin_function = value -> value
 
 type kind =
 	| KStar
@@ -277,6 +279,7 @@ and string_of_value e =
 	| VModule(t, lst) ->
 		let foldf k v rest = "\tlet " ^ k ^ " = " ^ string_of_value v ^ "\n" ^ rest in
 		"module\n" ^ VarMap.fold foldf lst "" ^ "end"
+	| VBuiltin _ -> "<builtin function>"
 
 let rec string_of_kind k = match k with
 	| KStar -> "*"
