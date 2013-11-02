@@ -1,0 +1,8 @@
+%%stdout%%
+Result: module
+	let option = module
+end
+	let __result__ = (None, module
+end)
+end
+%%stderr%%

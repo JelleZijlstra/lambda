@@ -1,0 +1,6 @@
+%%stdout%%
+Result: module
+	let f = \a. \b : 'typevar1. a + b
+	let __result__ = 3
+end
+%%stderr%%

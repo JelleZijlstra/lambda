@@ -1,0 +1,59 @@
+interface {
+	data list a = Nil | Cons a (list a),
+	fold_left : forall a b. (a -> b -> b) -> b -> list a -> b,
+	fold_right : forall a b. (a -> b -> b) -> b -> list a -> b,
+	reverse : forall a. list a -> list a,
+	map : forall a b. (a -> b) -> list a -> list b,
+	append : forall a. list a -> list a -> list a,
+	qsort : forall a. list a -> list a,
+	length : forall a. list a -> int,
+	filter : forall a. (a -> bool) -> list a -> list a
+}
+
+data list a = Nil | Cons a (list a)
+
+let rec fold_left = \f. \u. \l. match l with {
+	Nil -> u
+	| Cons hd tl -> f hd (fold_left f u tl)
+}
+
+let rec fold_right = \f. \u. \l. match l with {
+	Nil -> u
+	| Cons hd tl -> fold_right f (f hd u) tl
+}
+
+let reverse = fold_right Cons Nil
+
+let map = \f. fold_left (\hd. \rest. Cons (f hd) rest) Nil
+
+let rec rev_append = \l1. \l2. match l1 with {
+	Nil -> l2
+	| Cons hd tl -> rev_append tl (Cons hd l2)
+}
+
+let reverse = \l. rev_append l Nil
+
+let append = \l1. \l2. rev_append (reverse l1) l2
+
+let split = \f. \lst.
+	let rec split' = \lst. \l. \r. match lst with {
+		Nil -> (l, r)
+		| Cons hd tl ->
+			let rest = split' tl l r in
+			let l' = fst rest in
+			let r' = snd rest in
+			if f hd then (Cons hd l', r') else (l', Cons hd r')
+	} in
+	split' lst Nil Nil
+
+let rec qsort = \lst. match lst with {
+	Nil -> Nil
+	| Cons hd Nil -> Cons hd Nil
+	| Cons hd tl ->
+		let ls = split (\x. x < hd) tl in
+		append (qsort (fst ls)) (Cons hd (qsort (snd ls)))
+}
+
+let length = fold_left (\x. \l. l + 1) 0
+
+let filter = \f. fold_left (\e. \lst. if f e then Cons e lst else lst)

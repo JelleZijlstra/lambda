@@ -1,0 +1,5 @@
+%%stdout%%
+Result: module
+	let __result__ = (((Cons 3) Nil), \x. Cons x Nil)
+end
+%%stderr%%

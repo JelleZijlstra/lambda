@@ -1,0 +1,8 @@
+%%stdout%%
+"helloworld"
+Result: module
+	let s2 = "world"
+	let s1 = "hello"
+	let __result__ = ()
+end
+%%stderr%%

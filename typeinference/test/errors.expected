@@ -1,0 +1,3 @@
+%%stdout%%
+Error: Unbound type variable: bar
+%%stderr%%

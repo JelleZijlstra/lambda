@@ -1,0 +1,3 @@
+%%stdout%%
+%%stderr%%
+Fatal error: exception Typecheck.ImpossibleConstraint("Cannot unify types: unit and int")

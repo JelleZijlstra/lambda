@@ -1,0 +1,11 @@
+%%stdout%%
+8
+Result: module
+	let to_integer = \n. match n with Zero -> 0 | Succ n' -> 1 + to_integer n'
+	let plus = \n1. \n2 : 'typevar13. match n1 with Zero -> n2 | Succ n1' -> plus n1' (Succ n2)
+	let of_integer = \n. match n with 0 -> Zero | _ when n > 0 -> Succ (of_integer n - 1)
+	let mult = \n1. \n2 : 'typevar22. match n1 with Zero -> Zero | Succ n1' -> plus n2 (mult n1' n2)
+	let exp = \n1. \n2 : 'typevar33. match n2 with Zero -> Succ Zero | Succ n2' -> mult n1 (exp n1 n2')
+	let __result__ = ()
+end
+%%stderr%%

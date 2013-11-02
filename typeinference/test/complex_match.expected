@@ -1,0 +1,12 @@
+%%stdout%%
+3
+1
+2
+4
+5
+6
+7
+Result: module
+	let __result__ = \t. match t with C1 3 -> print 3 | C1 _ -> print 1 | C2 true false -> print 2 | C2 _ b -> print if b then 4 else 5 | C3 (3, true) -> print 6 | C3 (_, _) -> print 7
+end
+%%stderr%%

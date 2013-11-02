@@ -1,0 +1,5 @@
+%%stdout%%
+Result: module
+	let __result__ = (\x. type option a = None  | Some 'a in Some x, \x. type option a b = None  | Some 'b 'a in Some x true)
+end
+%%stderr%%

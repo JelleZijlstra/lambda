@@ -1,0 +1,3 @@
+%%stdout%%
+Error: Cannot unify types: (typevar0 with bar : 'typevar3) and {baz : int, foo : int}
+%%stderr%%

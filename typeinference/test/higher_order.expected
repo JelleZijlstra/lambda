@@ -1,0 +1,8 @@
+%%stdout%%
+0
+1
+3
+Result: module
+	let __result__ = \o. match o with None -> print 0 | Some Nil -> print 1 | Some Cons hd _ -> print hd
+end
+%%stderr%%
