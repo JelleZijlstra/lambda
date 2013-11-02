@@ -1,0 +1,28 @@
+let id = \x. x in
+
+let pair = \x. \y. \f. f x y in
+let fst = \p. p (\x. \y. x) in
+let snd = \p. p (\x. \y. y) in
+
+let false = \x. \y. y in
+let true = \x. \y. x in
+
+let nil = pair true true in
+let cons = \hd. \tl. pair false (pair hd tl) in
+let isnil = fst in
+let head = \lst. fst (snd lst) in
+let tail = \lst. snd (snd lst) in
+
+let lst = cons 1 (cons 2 nil) in
+
+let Z = \f. (\x. f (\y. x x y)) (\x. f (\y. x x y)) in
+
+let map = Z (\map. \f. \lst. ((isnil lst)
+	(\x. nil)
+	(\x. cons (f (head lst)) (map f (tail lst)))) id) in
+
+let print_lst = map (\x. print x) in
+
+let lst = print_lst lst in
+
+print cons
