@@ -23,7 +23,7 @@ let rec exists_in_pattern var p = match p with
 	| PPair(p1, p2) -> exists_in_pattern var p1 || exists_in_pattern var p2
 	| PGuarded(p, e) -> exists_in_pattern var p
 	| PAs(p, x) -> exists_in_pattern var p || x = var
-	| PVariable _ | PConstructor _ | PAnything | PBool _ | PInt _ -> false
+	| PVariable _ | PConstructor _ | PAnything | PBool _ | PInt _ | PString _ -> false
 
 type bound_vars = value VarMap.t
 
@@ -36,6 +36,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 	| Error e -> VError e
 	| Int n -> VInt n
 	| Bool b -> VBool b
+	| String s -> VString s
 	| Unit -> VUnit
 	| Binop(op, e1, e2) ->
 		let e1' = eval' e1 s in
@@ -51,11 +52,6 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 		| VInt n1, VInt n2 -> VBool(f_of_bool_binop op n1 n2)
 		| VInt _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_value e2')
 		| _, _ -> failwith("Invalid operand to binary expression: " ^ string_of_value e1'))
-	| Unop(op, e) ->
-		let e' = eval' e s in
-		(match e' with
-		| VInt n -> VInt(f_of_unop op n)
-		| _ -> failwith("Invalid operand to unary expression: " ^ string_of_value e'))
 	| Application(e1, e2) ->
 		let e1' = eval' e1 s in
 		let e2' = eval' e2 s in
@@ -63,6 +59,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 		| VAbstraction(arg, s, body) ->
 			eval' body (VarMap.add arg e2' s)
 		| VConstructor _ | VADTInstance(_, _) -> VADTInstance(e1', e2')
+		| VBuiltin b -> b e2'
 		| _ -> failwith "This expression is not a function; it cannot be applied")
 	| Fix(Abstraction(arg, _, body)) ->
 		eval' body (VarMap.add arg (VDummy(e, s)) s)
@@ -120,6 +117,9 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 				| _ -> None)
 			| PBool b -> (match e with
 				| VBool b' when b = b' -> Some []
+				| _ -> None)
+			| PString s -> (match e with
+				| VString s' when s = s' -> Some []
 				| _ -> None)
 			| PPair(p1, p2) -> (match e with
 				| VPair(e1, e2) -> (match eval_pattern p1 e1, eval_pattern p2 e2 with
@@ -180,4 +180,5 @@ and do_open m s = match VarMap.find m s with
 		VarMap.fold VarMap.add lst s
 	| _ -> failwith "Invalid open"
 
-let eval e = eval' e VarMap.empty
+let eval e =
+	eval' e (VarMap.map (fun b -> VBuiltin b) Builtin.builtin_values)

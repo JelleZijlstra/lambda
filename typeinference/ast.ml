@@ -10,20 +10,19 @@ type boolbinop =
 	| Less
 	| Greater
 
-type unop =
-	Print
-
 module VarMap = Map.Make(struct
 	type t = string
 	let compare = compare
 end)
 
 type ltype =
-	| TInt
+	TInt
 	| TBool
 	| TUnit
+	| TString
 	| TFunction of ltype * ltype
 	| Typevar of string
+	| TBoundTypevar of ltype
 	| TypeWithLabel of string * (string * ltype) list
 	| TProduct of ltype * ltype
 	| TSum of ltype * ltype
@@ -47,10 +46,10 @@ type expr =
 	| In of in_expr * expr
 	| Int of int
 	| Bool of bool
+	| String of string
 	| Binop of binop * expr * expr
 	| Boolbinop of boolbinop * expr * expr
 	| If of expr * expr * expr
-	| Unop of unop * expr
 	| Fix of expr
 	| Pair of expr * expr
 	| Projection of bool * expr
@@ -76,12 +75,14 @@ and pattern =
 	| PApplication of pattern * pattern
 	| PInt of int
 	| PBool of bool
+	| PString of string
 	| PPair of pattern * pattern
 	| PGuarded of pattern * expr
 	| PAs of pattern * string
 and value =
 	| VInt of int
 	| VBool of bool
+	| VString of string
 	| VUnit
 	| VAbstraction of string * value VarMap.t * expr
 	| VReference of value ref
@@ -93,6 +94,7 @@ and value =
 	| VError of string
 	| VDummy of expr * value VarMap.t
 	| VModule of module_type_entry list * value VarMap.t
+	| VBuiltin of builtin_function
 and in_expr =
 	| Let of string * ltype option * expr
 	| LetRec of string * ltype option * expr
@@ -101,6 +103,7 @@ and in_expr =
 	| SingleExpression of expr
 	| Open of string
 	| Import of string
+and builtin_function = value -> value
 
 type kind =
 	| KStar
@@ -114,15 +117,19 @@ let join glue =
 
 let ljoin glue lst = join "" (List.map (fun e -> glue ^ e) lst)
 
+let quote_string s = "\"" ^ s ^ "\""
+
 let rec string_of_type t = match t with
 	| TInt -> "int"
 	| TBool -> "bool"
+	| TString -> "string"
 	| TUnit -> "unit"
 	| TRef t -> "ref " ^ string_of_type t
 	| TFunction(TFunction(_, _) as f, t) ->
 		"(" ^ string_of_type f ^ ") -> " ^ string_of_type t
 	| TFunction(a, b) -> string_of_type a ^ " -> " ^ string_of_type b
 	| Typevar t -> "'" ^ t
+	| TBoundTypevar t -> string_of_type t
 	| TypeWithLabel(t, lst) -> "(" ^ t ^ " with "
 		^ join ", " (List.map (fun (l, t) -> l ^ " : " ^ string_of_type t) lst) ^ ")"
 	| TProduct(a, b) -> "(" ^ string_of_type a ^ " * " ^ string_of_type b ^ ")"
@@ -166,17 +173,12 @@ let f_of_bool_binop b = match b with
 	| Less -> (<)
 	| Greater -> (>)
 
-let f_of_unop op = match op with
-	| Print -> (fun x -> Printf.printf "%d\n" x; x)
-
-let string_of_unop op = match op with
-	| Print -> "print"
-
 let rec string_of_expr e =
 	match e with
 	| Var x -> x
 	| Unit -> "()"
 	| Int i -> string_of_int i
+	| String s -> quote_string s
 	| Bool true -> "true"
 	| Bool false -> "false"
 	| Abstraction(x, Some t, e1) -> "\\" ^ x ^ " : " ^ string_of_type t ^ ". " ^ string_of_expr e1
@@ -186,7 +188,6 @@ let rec string_of_expr e =
 	| Application(e1, e2) -> string_of_expr e1 ^ " " ^ string_of_expr e2
 	| In(e, e2) -> string_of_in_expr e ^ " in " ^ string_of_expr e2
 	| Binop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_binop op ^ " " ^ string_of_expr e2
-	| Unop(op, e) -> string_of_unop op ^ " " ^ string_of_expr e
 	| Fix e -> "fix " ^ string_of_expr e
 	| If(e1, e2, e3) -> "if " ^ string_of_expr e1 ^ " then " ^ string_of_expr e2 ^ " else " ^ string_of_expr e3
 	| Boolbinop(op, e1, e2) -> string_of_expr e1 ^ " " ^ string_of_bool_binop op ^ " " ^ string_of_expr e2
@@ -238,6 +239,7 @@ and string_of_pattern p = match p with
 	| PVariable v | PConstructor v -> v
 	| PApplication(p1, p2) -> string_of_pattern p1 ^ " " ^ string_of_pattern p2
 	| PInt n -> string_of_int n
+	| PString s -> quote_string s
 	| PBool true -> "true"
 	| PBool false -> "false"
 	| PPair(p1, p2) -> "(" ^ string_of_pattern p1 ^ ", " ^ string_of_pattern p2 ^ ")"
@@ -248,6 +250,7 @@ and string_of_value e =
 	match e with
 	| VUnit -> "()"
 	| VInt i -> string_of_int i
+	| VString s -> quote_string s
 	| VBool true -> "true"
 	| VBool false -> "false"
 	| VAbstraction(x, _, e1) -> "\\" ^ x ^ ". " ^ string_of_expr e1
@@ -267,6 +270,7 @@ and string_of_value e =
 	| VModule(t, lst) ->
 		let foldf k v rest = "\tlet " ^ k ^ " = " ^ string_of_value v ^ "\n" ^ rest in
 		"module\n" ^ VarMap.fold foldf lst "" ^ "end"
+	| VBuiltin _ -> "<builtin function>"
 
 let rec string_of_kind k = match k with
 	| KStar -> "*"

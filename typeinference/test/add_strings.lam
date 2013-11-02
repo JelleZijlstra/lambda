@@ -1,0 +1,5 @@
+let s1 = "hello"
+let s2 = "world"
+;;
+
+print (add_strings s1 s2)

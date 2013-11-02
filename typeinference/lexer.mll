@@ -27,10 +27,10 @@ rule token = parse
 		{ BOOL }
 | "unit"
 		{ UNIT }
+| "string"
+		{ STRING_T }
 | "->"	{ ARROW }
 | ":"	{ COLON }
-| "print"
-		{ PRINT }
 | "fix"	{ FIX }
 | "rec"	{ REC }
 | "true"
@@ -77,13 +77,15 @@ rule token = parse
 | ">"	{ GREATER }
 | "<"	{ LESS }
 | ['a'-'z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
-		{ IDENTIFIER(n) } (* variable names *)
+		{ IDENTIFIER(n)  (* variable names *) }
 | ['A'-'Z']['A'-'Z' '_' 'a'-'z' '\'' '0'-'9']* as n
 		{ CONSTRUCTOR(n) }
+| '"'[^'"']*'"' as s
+		{ STRING (String.sub s 1 (String.length s - 2)) }
 | [' ' '\t' '\n']
-		{ token lexbuf } (* ignore whitespace *)
+		{ token lexbuf (* ignore whitespace *) }
 | "#" [^'\n']+
-		{ token lexbuf} (* comments *)
+		{ token lexbuf  (* comments *) }
 | eof	{ EOF }
 | ['0'-'9']+ as n
 		{ INTEGER(int_of_string n)}

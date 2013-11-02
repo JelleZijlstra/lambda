@@ -1,12 +1,27 @@
 %{
 	open Ast
+
+	let rec desugar_let parameter_list body = match parameter_list with
+		| [] -> body
+		| (name, t)::tl -> Abstraction(name, t, desugar_let tl body)
+
+	let rec typed_desugar_let parameter_list body body_t = match parameter_list with
+		| [] -> body, body_t
+		| (name, Some t)::tl ->
+			let rest, rest_t = typed_desugar_let tl body body_t in
+			Abstraction(name, Some t, rest), TFunction(t, rest_t)
+		| (name, None)::tl ->
+			let rest, rest_t = typed_desugar_let tl body body_t in
+			let tv = TBoundTypevar (Ast.new_typevar()) in
+			Abstraction(name, Some tv, rest), TFunction(tv, rest_t)
+
 %}
 
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
-%token TIMES PRINT INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
+%token TIMES INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
 %token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
-%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS FORALL
+%token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS FORALL STRING STRING_T
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr program
 %type<Ast.expr> single_expr
@@ -14,7 +29,7 @@
 %type<Ast.adt> adt_list
 %type<Ast.pattern> pattern
 %type<(Ast.pattern * Ast.expr) list> pattern_list
-%type<string> IDENTIFIER CONSTRUCTOR
+%type<string> IDENTIFIER CONSTRUCTOR STRING
 %type<int> INTEGER
 %type<Ast.ltype> type
 %type<bool> BOOLEAN
@@ -46,7 +61,6 @@ single_expr:
 								{ Case($2, $4, $6) }
 	| INL single_expr			{ Injection(false, $2) }
 	| INR single_expr			{ Injection(true, $2) }
-	| PRINT single_expr			{ Unop(Print, $2) }
 	| FIX single_expr			{ Fix($2) }
 	| BANG single_expr			{ Dereference($2) }
 	| REF single_expr			{ Allocation($2) }
@@ -57,14 +71,22 @@ single_expr:
 	| assign_expr				{ $1 }
 
 in_expr:
-	| LET IDENTIFIER EQUALS expression
-								{ Let($2, None, $4) }
-	| LET IDENTIFIER COLON type EQUALS expression
-								{ Let($2, Some $4, $6) }
-	| LET REC IDENTIFIER EQUALS expression
-								{ LetRec($3, None, $5) }
-	| LET REC IDENTIFIER COLON type EQUALS expression
-								{ LetRec($3, Some $5, $7) }
+	| LET IDENTIFIER possibly_typed_parameter_list EQUALS expression
+								{ Let($2, None, desugar_let $3 $5) }
+	| LET IDENTIFIER possibly_typed_parameter_list COLON type EQUALS expression
+								{
+									let value, t = typed_desugar_let $3 $7 $5 in
+									Let($2, Some t, value)
+								}
+	| LET REC IDENTIFIER possibly_typed_parameter_list EQUALS expression
+								{ LetRec($3, None, desugar_let $4 $6) }
+	| LET REC IDENTIFIER possibly_typed_parameter_list COLON type EQUALS expression
+								{
+									let value, t = typed_desugar_let $4 $8 $6 in
+									LetRec($3, Some t, value)
+								}
+	| DATA IDENTIFIER parameter_list
+								{ LetADT($2, $3, [])}
 	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
 								{ LetADT($2, $3, $5::$6) }
 	| TYPE IDENTIFIER EQUALS type
@@ -115,6 +137,7 @@ simple_expr:
 	| CONSTRUCTOR				{ Constructor($1) }
 	| INTEGER					{ Int($1) }
 	| BOOLEAN					{ Bool($1) }
+	| STRING					{ String($1) }
 	| LPAREN expression COMMA expression RPAREN
 								{ Pair($2, $4) }
 	| LPAREN RPAREN				{ Unit }
@@ -172,6 +195,7 @@ simple_type:
 	| INT						{ TInt }
 	| BOOL						{ TBool }
 	| UNIT						{ TUnit }
+	| STRING_T					{ TString }
 	| IDENTIFIER				{ Typevar $1 }
 	| module_type				{ $1 }
 
@@ -185,6 +209,8 @@ module_type_body:
 								{ $1::$3 }
 
 module_type_entry:
+	| DATA IDENTIFIER parameter_list
+								{ ConcreteType($2, $3, TADT [])}
 	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
 								{ ConcreteType($2, $3, TADT($5::$6)) }
 	| TYPE IDENTIFIER parameter_list
@@ -235,6 +261,13 @@ pattern_list:
 	|							{ [] }
 	| BAR pattern ARROW expression pattern_list
 								{ ($2, $4)::$5 }
+
+possibly_typed_parameter_list:
+	|							{ [] }
+	| IDENTIFIER possibly_typed_parameter_list
+								{ ($1, None)::$2 }
+	| LPAREN IDENTIFIER COLON type RPAREN possibly_typed_parameter_list
+								{ ($2, Some $4)::$6 }
 
 parameter_list:
 	|							{ [] }

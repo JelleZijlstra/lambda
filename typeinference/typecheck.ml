@@ -60,7 +60,7 @@ type type_cs = Type of ltype * expr * ConstraintSet.t * KindConstraintSet.t
 
 let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 	| Typevar t' -> VariableSet.singleton t'
-	| TInt | TBool | TUnit -> VariableSet.empty
+	| TInt | TBool | TUnit | TString -> VariableSet.empty
 	| TProduct(t1, t2)
 	| TSum(t1, t2)
 	| TParameterized(t1, t2)
@@ -83,6 +83,7 @@ let rec free_variables (ty : ltype) : VariableSet.t = match ty with
 				VariableSet.remove n (VariableSet.union t_vars rest)
 			| Value(n, t) -> VariableSet.union (free_variables t) rest in
 		List.fold_right foldf lst VariableSet.empty
+	| TBoundTypevar _ -> failwith "impossible"
 
 let free_variables_context (c : Context.t) =
 	Context.fold_vars (fun _ t a -> VariableSet.union (free_variables t) a) VariableSet.empty c
@@ -91,7 +92,7 @@ let rec replace_in_type typevar new_type t =
 	match t with
 	| Typevar t' when t' = typevar -> new_type
 	| TypeWithLabel(n, lst) when n = typevar -> new_type
-	| Typevar _ | TInt | TBool | TUnit -> t
+	| Typevar _ | TInt | TBool | TUnit | TString -> t
 	| TFunction(t1, t2) -> TFunction(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| TProduct(t1, t2) -> TProduct(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
 	| TSum(t1, t2) -> TSum(replace_in_type typevar new_type t1, replace_in_type typevar new_type t2)
@@ -115,6 +116,7 @@ let rec replace_in_type typevar new_type t =
 			| AbstractType(n, params)::tl -> AbstractType(n, params)::loop tl
 			| Value(n, t)::tl -> Value(n, replace_in_type typevar new_type t)::loop tl in
 		TModule(loop lst)
+	| TBoundTypevar _ -> failwith "impossible"
 
 let rec replace_in_kind (kv : string) (new_kind : kind) (k : kind) = match k with
 	| KVar x when kv = x -> new_kind
@@ -184,7 +186,7 @@ let replace_kind kvar new_kind ks =
 
 let rec is_free_variable (t : string) (ty : ltype) = match ty with
 	| Typevar t' -> t = t'
-	| TInt | TBool | TUnit -> false
+	| TInt | TBool | TUnit | TString -> false
 	| TProduct(t1, t2)
 	| TSum(t1, t2)
 	| TParameterized(t1, t2)
@@ -203,6 +205,7 @@ let rec is_free_variable (t : string) (ty : ltype) = match ty with
 			| ConcreteType(_, _, t')::tl -> is_free_variable t t' || loop tl
 			| AbstractType(_, _)::tl -> loop tl in
 		loop lst
+	| TBoundTypevar _ -> failwith "impossible"
 
 let rec is_free_kvar (t : string) (k : kind) = match k with
 	| KVar x -> t = x
@@ -310,7 +313,7 @@ let rec unify_kinds (ks : KindConstraintSet.t) : ksubstitution =
 
 let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : ltype =
 	match t with
-	| TInt | TBool | TUnit -> t
+	| TInt | TBool | TUnit | TString -> t
 	| TRef t' -> TRef(apply_substitution s t' b)
 	| TFunction(t1, t2) -> TFunction(apply_substitution s t1 b, apply_substitution s t2 b)
 	| TSum(t1, t2) -> TSum(apply_substitution s t1 b, apply_substitution s t2 b)
@@ -336,6 +339,7 @@ let rec apply_substitution (s : substitution) (t : ltype) (b : VariableSet.t) : 
 				ConcreteType(n, params, apply_substitution s t new_b)::loop tl new_b
 			| Value(n, t)::tl -> Value(n, apply_substitution s t b)::loop tl b in
 		TModule(loop lst b)
+	| TBoundTypevar _ -> failwith "impossible"
 
 let rec get_kind (t : ltype) (c : Context.t) : ltype * kind * KindConstraintSet.t =
 	let add = KindConstraintSet.add in
@@ -346,7 +350,7 @@ let rec get_kind (t : ltype) (c : Context.t) : ltype * kind * KindConstraintSet.
 		let kc = add (KEquals(k1, KStar)) (add (KEquals(k2, KStar)) (union kc1 kc2)) in
 		t1, t2, kc in
 	match t with
-	| TInt | TBool | TUnit -> t, KStar, kem
+	| TInt | TBool | TUnit | TString -> t, KStar, kem
 	| TProduct(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TProduct(t1, t2), KStar, kc
 	| TSum(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TSum(t1, t2), KStar, kc
 	| TFunction(t1, t2) -> let t1, t2, kc = type_binary t1 t2 in TFunction(t1, t2), KStar, kc
@@ -362,6 +366,8 @@ let rec get_kind (t : ltype) (c : Context.t) : ltype * kind * KindConstraintSet.
 				| None -> Typevar tv in
 			t, k, kem
 		with Not_found -> raise(TypeError("Unbound type variable: " ^ tv)))
+	| TBoundTypevar (Typevar tv) -> Typevar tv, KStar, kem
+	| TBoundTypevar _ -> raise(TypeError("Invalid use of TBoundTypevar"))
 	| TypeWithLabel(n, lst) ->
 		let foldf (l, t) (lst, rest) =
 			let t, k, kc = get_kind t c in
@@ -487,6 +493,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 	| Int _ -> Type(TInt, e, em, kem)
 	| Bool _ -> Type(TBool, e, em, kem)
 	| Unit -> Type(TUnit, e, em, kem)
+	| String _ -> Type(TString, e, em, kem)
 	| Var x ->
 		(try Type(instantiate (Context.find_var x c), e, em, kem)
 			with Not_found -> raise (TypeError("Unbound variable: " ^ x)))
@@ -512,9 +519,6 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 			ConstraintSet.add (Equals(t1, TInt))
 			(ConstraintSet.add (Equals(t2, TInt))
 				(ConstraintSet.union cs1 cs2)), KindConstraintSet.union ks1 ks2)
-	| Unop(op, e) ->
-		let Type(t, e, cs, ks) = get_type e c in
-		Type(TInt, Unop(op, e), ConstraintSet.add (Equals(t, TInt)) cs, ks)
 	| Application(e1, e2) ->
 		let Type(t1, e1, cs1, ks1) = get_type e1 c in
 		let Type(t2, e2, cs2, ks2) = get_type e2 c in
@@ -640,6 +644,7 @@ let rec get_type (e : expr) (c : Context.t) : type_cs =
 				| PVariable x -> (p, [(x, t)], cs, kem)
 				| PInt _ -> (p, [], ConstraintSet.add (Equals(t, TInt)) cs, kem)
 				| PBool _ -> (p, [], ConstraintSet.add (Equals(t, TBool)) cs, kem)
+				| PString _ -> (p, [], ConstraintSet.add (Equals(t, TString)) cs, kem)
 				| PPair(p1, p2) ->
 					let t1 = Ast.new_typevar() in
 					let t2 = Ast.new_typevar() in
@@ -775,8 +780,13 @@ and get_type_import (m : string) (c : Context.t) =
 	let tc, t, e, cs, ks = get_type_let com m None (Context.set_loc new_loc c) in
 	Let(m, Some t, e), tc, cs, ks
 
+let initial_context loc =
+	let builtins = Builtin.builtin_types in
+	let c = Context.empty loc in
+	VarMap.fold (fun k t rest -> Context.add_var k t rest) builtins c
+
 let typecheck e verbose loc =
-	try let Type(t, e', cs, ks) = get_type e (Context.empty loc) in
+	try let Type(t, e', cs, ks) = get_type e (initial_context loc) in
 		(try
 			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
 				Printf.printf "Constraints:\n%s\n" (print_cs cs);

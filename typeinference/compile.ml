@@ -17,12 +17,11 @@ let create_new_var : unit -> string =
 type desugar_ctxt = expr VarMap.t
 
 let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
-	| Var _ | Int _ | Bool _ | Unit | Error _ -> e
+	| Var _ | Int _ | Bool _ | Unit | Error _ | String _ -> e
 	| Application(e1, e2) -> Application(desugar e1 vm, desugar e2 vm)
 	| Abstraction(arg, t, body) -> Abstraction(arg, t, desugar body vm)
 	| Binop(op, e1, e2) -> Binop(op, desugar e1 vm, desugar e2 vm)
 	| Boolbinop(op, e1, e2) -> Boolbinop(op, desugar e1 vm, desugar e2 vm)
-	| Unop(op, e) -> Unop(op, desugar e vm)
 	| Fix(e) -> Fix(desugar e vm)
 	| If(e1, e2, e3) -> If(desugar e1 vm, desugar e2 vm, desugar e3 vm)
 	| Pair(e1, e2) -> Pair(desugar e1 vm, desugar e2 vm)
@@ -50,6 +49,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 			let rec compile_pattern p e cont = match p with
 			| PInt n -> If(Boolbinop(Equals, Int n, e), Injection(true, cont), Injection(false, Unit))
 			| PBool b -> If(Boolbinop(Equals, Bool b, e), Injection(true, cont), Injection(false, Unit))
+			| PString s -> If(Boolbinop(Equals, String s, e), Injection(true, cont), Injection(false, Unit))
 			| PAnything -> Injection(true, cont)
 			| PVariable x -> Injection(true, In(Let(x, None, e), cont))
 			| PApplication(p1, p2)
@@ -116,10 +116,11 @@ let rec compile_rec e = match e with
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ "(" ^ compile_rec e2 ^ "))"
 	| Abstraction(arg, _, body) -> "(function(" ^ translate_var arg ^ ") {return (" ^ compile_rec body ^ ");})"
 	| Int n -> string_of_int n
+	| String s -> "\"" ^ s ^ "\""
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_binop op ^ compile_rec e2 ^ ")"
 	| Boolbinop(Equals, e1, e2) -> "(" ^ compile_rec e1 ^ " == " ^ compile_rec e2 ^ ")"
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
-	| Unop(Print, e) -> "((function(x) {console.log(x);return x;})(" ^ compile_rec e ^ "))"
+(* 	| Unop(Print, e) -> "((function(x) {console.log(x);return x;})(" ^ compile_rec e ^ "))" *)
 	| Fix(Abstraction(arg, t, body)) ->
 		(* Apply the Z combinator *)
 		compile_rec(Application(z, Abstraction(arg, t, body)))
@@ -169,12 +170,13 @@ let rec compile_rec e = match e with
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(fun " ^ translate_var arg ^ " -> " ^ compile_rec body ^ ")"
 	| Int n -> string_of_int n
+	| String s -> "\"" ^ s ^ "\""
 	| Bool true -> "true"
 	| Bool false -> "false"
 	| Unit -> "()"
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_binop op ^ compile_rec e2 ^ ")"
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
-	| Unop(Print, e) -> "(let e = " ^ compile_rec e ^ " in Printf.printf \"%d\\n\" e; e)"
+(* 	| Unop(Print, e) -> "(let e = " ^ compile_rec e ^ " in Printf.printf \"%d\\n\" e; e)" *)
 	| If(e1, e2, e3) -> "(if " ^ compile_rec e1 ^ " then " ^ compile_rec e2 ^ " else " ^ compile_rec e3 ^ ")"
 	| Fix(Abstraction(arg, t, body)) -> "(let rec " ^ translate_var arg ^ " = " ^ compile_rec body ^ " in " ^ translate_var arg ^ ")"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
@@ -211,13 +213,14 @@ let rec compile_rec e = match e with
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(" ^ translate_var arg ^ " => (" ^ compile_rec body ^ "))"
 	| Int n -> string_of_int n
+	| String s -> "\"" ^ s ^ "\""
 	| Bool true -> "true"
 	| Bool false -> "false"
 	| Unit -> "()"
 	| Binop(op, e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ string_of_binop op ^ " " ^ compile_rec e2 ^ ")"
 	| Boolbinop(Equals, e1, e2) -> "(" ^ compile_rec e1 ^ " == " ^ compile_rec e2 ^ ")"
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ string_of_bool_binop op ^ " " ^ compile_rec e2 ^ ")"
-	| Unop(Print, e) -> "((func: x; echo x; x; end)" ^ compile_rec e ^ ")"
+(* 	| Unop(Print, e) -> "((func: x; echo x; x; end)" ^ compile_rec e ^ ")" *)
 	| If(e1, e2, e3) -> "(if (" ^ compile_rec e1 ^ "); " ^ compile_rec e2 ^ "; else " ^ compile_rec e3 ^ "; end)"
 	| Fix(Abstraction(arg, _, body)) ->
 		"((func: ; private " ^ translate_var arg ^ " = " ^ compile_rec body ^ "; "
