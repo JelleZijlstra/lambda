@@ -265,6 +265,22 @@ class proceduref(lib_function):
 		self.ensure_args(args, 1)
 		return ast.scm_bool(isinstance(args[0], ast.function) or isinstance(args[0], lib_function))
 
+class ltf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 2)
+		self.ensure_arg_type(args, 0, ast.literal)
+		self.ensure_arg_type(args, 1, ast.literal)
+		if x.tkn != y.tkn:
+			raise(runtime_error("+: arguments must have same type"))
+		if x.tkn == T_INT or x.tkn == T_FLOAT:
+			return ast.scm_bool(x.content < y.content)
+		elif x.tkn == T_RATIONAL:
+			x1, x2 = x.content
+			y1, y2 = y.content
+			return ast.scm_bool(x1 / x2 < y1 / y2)
+		elif x.tkn == T_COMPLEX:
+			raise(runtime_error("+: cannot compare complex numbers"))
+
 lib_macros = {
 	"lambda": lambdam(),
 	"define": definem(),
@@ -295,4 +311,5 @@ lib_names = {
 	"boolean?": booleanf(),
 	"symbol?": symbolf(),
 	"procedure?": proceduref(),
+	"<": ltf(),
 }
