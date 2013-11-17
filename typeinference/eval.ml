@@ -27,11 +27,12 @@ let rec exists_in_pattern var p = match p with
 
 type bound_vars = value VarMap.t
 
-let rec eval' (e : expr) (s : bound_vars) : value = match e with
+let rec eval' (e, t : typed_expr) (s : bound_vars) : value = match e with
 	| Var x -> (match VarMap.find x s with
 		| VDummy(e, s) -> eval' e s
 		| v -> v)
 	| Dummy v -> v
+	| Wrapped e -> eval' e s
 	| Abstraction(x, _, e) -> VAbstraction(x, s, e)
 	| Error e -> VError e
 	| Int n -> VInt n
@@ -61,8 +62,8 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 		| VConstructor _ | VADTInstance(_, _) -> VADTInstance(e1', e2')
 		| VBuiltin b -> b e2'
 		| _ -> failwith "This expression is not a function; it cannot be applied")
-	| Fix(Abstraction(arg, _, body)) ->
-		eval' body (VarMap.add arg (VDummy(e, s)) s)
+	| Fix(Abstraction(arg, _, body), _) ->
+		eval' body (VarMap.add arg (VDummy((e, t), s)) s)
 	| Fix _ -> failwith "Invalid use of fix"
 	| If(e1, e2, e3) -> (match eval' e1 s with
 		| VBool true -> eval' e2 s
@@ -77,8 +78,8 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 		| _ -> failwith "This expression is not a product; it cannot be projected")
 	| Injection(b, e) -> VInjection(b, eval' e s)
 	| Case(e1, e2, e3) -> (match eval' e1 s with
-		| VInjection(false, e') -> eval' (Application(e2, Dummy e')) s
-		| VInjection(true, e') -> eval' (Application(e3, Dummy e')) s
+		| VInjection(false, e') -> eval' (Application(e2, (Dummy e', ref None)), ref None) s
+		| VInjection(true, e') -> eval' (Application(e3, (Dummy e', ref None)), ref None) s
 		| _ -> failwith "This expression is not a sum; it cannot be matched on")
 	| Assignment(e1, e2) -> (match eval' e1 s with
 		| VReference r -> r := (eval' e2 s)
@@ -100,7 +101,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 		let e1' = eval' e1 s in
 		eval' e2 (VarMap.add x e1' s)
 	| In(LetRec(x, t, e1), e2) ->
-		let e1' = eval' (Fix(Abstraction(x, t, e1))) s in
+		let e1' = eval' (Fix(Abstraction(x, t, e1), t), t) s in
 		eval' e2 (VarMap.add x e1' s)
 	| In(TypeSynonym(_, _), e) (* Type declarations are ignored at runtime *)
 	| In(LetADT(_, _, _), e) -> eval' e s
@@ -162,7 +163,7 @@ let rec eval' (e : expr) (s : bound_vars) : value = match e with
 				let f = VarMap.add x (eval' e s) in
 				f (loop tl (f s))
 			| LetRec(x, t, e)::tl ->
-				let v = eval' (Fix(Abstraction(x, t, e))) s in
+				let v = eval' (Fix(Abstraction(x, t, e), t), t) s in
 				let f = VarMap.add x v in
 				f (loop tl (f s))
 			| SingleExpression e::tl ->

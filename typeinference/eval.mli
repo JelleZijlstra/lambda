@@ -1,2 +1,2 @@
 (** Evaluates an expression according to call-by-value semantics *)
-val eval : Ast.expr -> Ast.value
+val eval : Ast.typed_expr -> Ast.value

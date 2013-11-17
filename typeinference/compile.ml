@@ -1,8 +1,18 @@
 open Ast
 
+let dummy_t = ref None
+
 let z =
-	let inner_z = Abstraction("x", None, Application(Var "f", Abstraction("y", None, Application(Application(Var "x", Var "x"), Var "y")))) in
-	Abstraction("f", None, Application(inner_z, inner_z))
+	let inner_z = Abstraction("x", dummy_t,
+		(Application((Var "f", dummy_t),
+			(Abstraction("y", dummy_t,
+				(Application(
+					(Application((Var "x", dummy_t), (Var "x", dummy_t)), dummy_t),
+					(Var "y", dummy_t)),
+				dummy_t)),
+			dummy_t)),
+		dummy_t)), dummy_t in
+	(Abstraction("f", dummy_t, (Application(inner_z, inner_z), dummy_t)), dummy_t)
 
 let translate_var v =
 	"v" ^ Str.global_replace (Str.regexp "'") "_u" v
@@ -16,8 +26,9 @@ let create_new_var : unit -> string =
 
 type desugar_ctxt = expr VarMap.t
 
-let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
+let rec desugar (e, t : typed_expr) (vm : desugar_ctxt) : typed_expr = (match e with
 	| Var _ | Int _ | Bool _ | Unit | Error _ | String _ -> e
+	| Wrapped e -> let e, _ = desugar e vm in e
 	| Application(e1, e2) -> Application(desugar e1 vm, desugar e2 vm)
 	| Abstraction(arg, t, body) -> Abstraction(arg, t, desugar body vm)
 	| Binop(op, e1, e2) -> Binop(op, desugar e1 vm, desugar e2 vm)
@@ -34,49 +45,54 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 	| Sequence(e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)
 	| Record lst -> Record(VarMap.map (fun e -> desugar e vm) lst)
 	| Member(e, l) -> Member(desugar e vm, l)
-	| In(Let(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), desugar e1 vm)
-	| In(LetRec(x, t, e1), e2) -> Application(Abstraction(x, t, desugar e2 vm), Fix(Abstraction(x, t, desugar e1 vm)))
-	| In(TypeSynonym(_, _), e) -> desugar e vm
+	| In(Let(x, t, e1), e2) ->
+		Application((Abstraction(x, t, desugar e2 vm), dummy_t), desugar e1 vm)
+	| In(LetRec(x, t, e1), e2) ->
+		Application((Abstraction(x, t, desugar e2 vm), dummy_t), (Fix(Abstraction(x, t, desugar e1 vm), dummy_t), dummy_t))
+	| In(TypeSynonym(_, _), e) -> Wrapped(desugar e vm)
 	| In(LetADT(_, _, lst), e) ->
 		let _, vm' = desugar_adt lst vm in
-		desugar e vm'
+		Wrapped(desugar e vm')
 	| In(SingleExpression e1, e2) -> Sequence(desugar e1 vm, desugar e2 vm)
 	| Constructor x -> VarMap.find x vm
 	| Dummy _ -> failwith "Should not appear in code"
 	| Match(e, lst) ->
 		let x = create_new_var() in
+		let inj b c = Injection(b, (c, dummy_t)), dummy_t in
+		let id = Abstraction("x", dummy_t, (Var "x", dummy_t)), dummy_t in
 		let foldf rest (p, e) =
 			let rec compile_pattern p e cont = match p with
-			| PInt n -> If(Boolbinop(Equals, Int n, e), Injection(true, cont), Injection(false, Unit))
-			| PBool b -> If(Boolbinop(Equals, Bool b, e), Injection(true, cont), Injection(false, Unit))
-			| PString s -> If(Boolbinop(Equals, String s, e), Injection(true, cont), Injection(false, Unit))
-			| PAnything -> Injection(true, cont)
-			| PVariable x -> Injection(true, In(Let(x, None, e), cont))
+			| PInt n -> If((Boolbinop(Equals, (Int n, dummy_t), e), dummy_t), inj true cont, inj false Unit)
+			| PBool b -> If((Boolbinop(Equals, (Bool b, dummy_t), e), dummy_t), inj true cont, inj false Unit)
+			| PString s -> If((Boolbinop(Equals, (String s, dummy_t), e), dummy_t), inj true cont, inj false Unit)
+			| PAnything -> Injection(true, (cont, dummy_t))
+			| PVariable x -> Injection(true, (In(Let(x, dummy_t, e), (cont, dummy_t)), dummy_t))
 			| PApplication(p1, p2)
 			| PPair(p1, p2) ->
 				(* case match (fst e) c of \_. inl () | \x. match (snd e) x *)
-				let fst = Projection(false, e) in
-				let snd = Projection(true, e) in
+				let fst = Projection(false, e), dummy_t in
+				let snd = Projection(true, e), dummy_t in
 				let p2' = compile_pattern p2 snd cont in
-				let p1_failed = Abstraction("_", None, Injection(false, Unit)) in
-				let p1_succeeded = Abstraction("x", None, Var "x") in
-				Case(compile_pattern p1 fst p2', p1_failed, p1_succeeded)
+				let p1_failed = Abstraction("_", dummy_t, inj false Unit), dummy_t in
+				Case((compile_pattern p1 fst p2', dummy_t), p1_failed, id)
 			| PGuarded(p, e') ->
-				let cont' = If(desugar e' vm, Injection(true, cont), Injection(false, Unit)) in
-				let p_failed = Abstraction("_", None, Injection(false, Unit)) in
-				let p_succeeded = Abstraction("x", None, Var "x") in
-				Case(compile_pattern p e cont', p_failed, p_succeeded)
+				let cont' = If(desugar e' vm, inj true cont, inj false Unit) in
+				let p_failed = Abstraction("_", dummy_t, inj false Unit), dummy_t in
+				Case((compile_pattern p e cont', dummy_t), p_failed, id)
 			| PAs(p, x) ->
-				let cont' = In(Let(x, None, e), cont) in
+				let cont' = In(Let(x, dummy_t, e), (cont, dummy_t)) in
 				compile_pattern p e cont'
-			| PConstructor x -> If(Boolbinop(Equals, Constructor x, e), Injection(true, cont), Injection(false, Unit))
+			| PConstructor x ->
+				If((Boolbinop(Equals, (Constructor x, dummy_t), e), dummy_t), inj true cont, inj false Unit)
 			in
 			let new_x = create_new_var() in
-			let compiled_p = compile_pattern p (Var x) (Abstraction(new_x, None, desugar e vm)) in
-			Case(compiled_p, Abstraction(new_x, None, rest), Abstraction(new_x, None, Application(Var new_x, Unit)))
+			let compiled_p = compile_pattern p (Var x, dummy_t) (Abstraction(new_x, dummy_t, desugar e vm)), dummy_t in
+			let lcase = Abstraction(new_x, dummy_t, rest), dummy_t in
+			let rcase = Abstraction(new_x, dummy_t, (Application((Var new_x, dummy_t), (Unit, dummy_t)), dummy_t)), dummy_t in
+			Case(compiled_p, lcase, rcase), dummy_t
 		in
-		let mtch = List.fold_left foldf (Error "Inexhaustive pattern match") (List.rev lst) in
-		Application(Abstraction(x, None, mtch), desugar e vm)
+		let mtch = List.fold_left foldf (Error "Inexhaustive pattern match", dummy_t) (List.rev lst) in
+		Application((Abstraction(x, dummy_t, mtch), dummy_t), desugar e vm)
 	| ConstructorMember(e, l) -> Member(desugar e vm, l)
 	| In(Open m, e) -> In(Open m, desugar e vm)
 	| In(Import m, e) -> In(Import m, desugar e vm)
@@ -93,7 +109,7 @@ let rec desugar (e : expr) (vm : desugar_ctxt) : expr = match e with
 				vars @ loop tl vm'
 			| [] -> []
 		in
-		Module(t, loop lst vm)
+		Module(t, loop lst vm)), t
 and desugar_adt lst vm =
 	(* ADT constructors are converted into functions that return nested
 		pairs of values. For example, Cons would become
@@ -103,16 +119,17 @@ and desugar_adt lst vm =
 		deconstruction. *)
 	let foldf (lets, rest) (name, lst) =
 		let vars = List.mapi (fun i _ -> "x" ^ string_of_int i) lst in
-		let result = List.fold_left (fun rest v -> Pair(rest, Var v)) (Constructor name) vars in
-		let f = List.fold_right (fun v rest -> Abstraction(v, None, rest)) vars result in
-		(Let(name, None, f)::lets, VarMap.add name f rest)
+		let result = List.fold_left (fun rest v -> Pair(rest, (Var v, dummy_t)), dummy_t) (Constructor name, dummy_t) vars in
+		let f, t = List.fold_right (fun v rest -> Abstraction(v, dummy_t, rest), dummy_t) vars result in
+		(Let(name, dummy_t, (f, t))::lets, VarMap.add name f rest)
 	in
 	List.fold_left foldf ([], vm) lst
 
 let desugar e = desugar e VarMap.empty
 
-let rec compile_rec e = match e with
+let rec compile_rec (e, _) = match e with
 	| Var x -> translate_var x
+	| Wrapped e -> compile_rec e
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ "(" ^ compile_rec e2 ^ "))"
 	| Abstraction(arg, _, body) -> "(function(" ^ translate_var arg ^ ") {return (" ^ compile_rec body ^ ");})"
 	| Int n -> string_of_int n
@@ -121,9 +138,9 @@ let rec compile_rec e = match e with
 	| Boolbinop(Equals, e1, e2) -> "(" ^ compile_rec e1 ^ " == " ^ compile_rec e2 ^ ")"
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
 (* 	| Unop(Print, e) -> "((function(x) {console.log(x);return x;})(" ^ compile_rec e ^ "))" *)
-	| Fix(Abstraction(arg, t, body)) ->
+	| Fix(Abstraction(arg, t, body), _) ->
 		(* Apply the Z combinator *)
-		compile_rec(Application(z, Abstraction(arg, t, body)))
+		compile_rec(Application(z, (Abstraction(arg, t, body), dummy_t)), dummy_t)
 	| If(e1, e2, e3) -> "((" ^ compile_rec e1 ^ ") ? (" ^ compile_rec e2 ^ ") : (" ^ compile_rec e3 ^ "))"
 	| Bool true -> "true"
 	| Bool false -> "false"
@@ -142,8 +159,11 @@ let rec compile_rec e = match e with
 		let foldf l e rest = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> "(" ^ compile_rec e ^ ")." ^ translate_var l
-	| In(Let(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
-	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| In(Let(x, t, e1), e2) ->
+		compile_rec(Application((Abstraction(x, t, e2), dummy_t), e1), dummy_t)
+	| In(LetRec(x, t, e1), e2) ->
+		let fix = Fix((Abstraction(x, t, e1), dummy_t)), dummy_t in
+		compile_rec(Application((Abstraction(x, t, e2), dummy_t), fix), dummy_t)
 	| Error e -> "((function() { throw new Error(\"" ^ e ^ "\"); })())"
 	| Constructor x -> "\"" ^ x ^ "\""
 	| Module(_, lst) ->
@@ -165,8 +185,9 @@ let compile e =
 	let e' = desugar e in
 	"console.log(\"Result: \" + " ^ compile_rec e' ^ ");"
 
-let rec compile_rec e = match e with
+let rec compile_rec (e, _) = match e with
 	| Var x -> translate_var x
+	| Wrapped e -> compile_rec e
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(fun " ^ translate_var arg ^ " -> " ^ compile_rec body ^ ")"
 	| Int n -> string_of_int n
@@ -178,7 +199,7 @@ let rec compile_rec e = match e with
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ string_of_bool_binop op ^ compile_rec e2 ^ ")"
 (* 	| Unop(Print, e) -> "(let e = " ^ compile_rec e ^ " in Printf.printf \"%d\\n\" e; e)" *)
 	| If(e1, e2, e3) -> "(if " ^ compile_rec e1 ^ " then " ^ compile_rec e2 ^ " else " ^ compile_rec e3 ^ ")"
-	| Fix(Abstraction(arg, t, body)) -> "(let rec " ^ translate_var arg ^ " = " ^ compile_rec body ^ " in " ^ translate_var arg ^ ")"
+	| Fix(Abstraction(arg, t, body), _) -> "(let rec " ^ translate_var arg ^ " = " ^ compile_rec body ^ " in " ^ translate_var arg ^ ")"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
 	| Projection(false, e) -> "(fst " ^ compile_rec e ^ ")"
 	| Projection(true, e) -> "(snd " ^ compile_rec e ^ ")"
@@ -190,8 +211,11 @@ let rec compile_rec e = match e with
 	| Sequence(e1, e2) -> "(ignore(" ^ compile_rec e1 ^ "); " ^ compile_rec e2 ^ ")"
 	| Record lst -> failwith "Not implemented"
 	| Member(e, l) -> failwith "Not implemented"
-	| In(Let(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
-	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| In(Let(x, t, e1), e2) ->
+		compile_rec(Application((Abstraction(x, t, e2), dummy_t), e1), dummy_t)
+	| In(LetRec(x, t, e1), e2) ->
+		let fix = Fix((Abstraction(x, t, e1), dummy_t)), dummy_t in
+		compile_rec(Application((Abstraction(x, t, e2), dummy_t), fix), dummy_t)
 	| Error e -> "(failwith \"" ^ e ^ "\")"
 	| Constructor x -> "\"" ^ x ^ "\""
 	| ConstructorMember(e, l) -> failwith "not implemented"
@@ -208,8 +232,9 @@ let make_new_var : unit -> string =
 		n := current + 1;
 		"n" ^ string_of_int current
 
-let rec compile_rec e = match e with
+let rec compile_rec (e, _) = match e with
 	| Var x -> translate_var x
+	| Wrapped e -> compile_rec e
 	| Application(e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ compile_rec e2 ^ ")"
 	| Abstraction(arg, _, body) -> "(" ^ translate_var arg ^ " => (" ^ compile_rec body ^ "))"
 	| Int n -> string_of_int n
@@ -222,7 +247,7 @@ let rec compile_rec e = match e with
 	| Boolbinop(op, e1, e2) -> "(" ^ compile_rec e1 ^ " " ^ string_of_bool_binop op ^ " " ^ compile_rec e2 ^ ")"
 (* 	| Unop(Print, e) -> "((func: x; echo x; x; end)" ^ compile_rec e ^ ")" *)
 	| If(e1, e2, e3) -> "(if (" ^ compile_rec e1 ^ "); " ^ compile_rec e2 ^ "; else " ^ compile_rec e3 ^ "; end)"
-	| Fix(Abstraction(arg, _, body)) ->
+	| Fix(Abstraction(arg, _, body), _) ->
 		"((func: ; private " ^ translate_var arg ^ " = " ^ compile_rec body ^ "; "
 			^ translate_var arg ^ "; end) ())"
 	| Pair(e1, e2) -> "(" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ ")"
@@ -241,8 +266,11 @@ let rec compile_rec e = match e with
 		let foldf l e rest = "\"" ^ l ^ "\": " ^ compile_rec e ^ ", " ^ rest in
 		"{" ^ VarMap.fold foldf lst "" ^ "}"
 	| Member(e, l) -> "((" ^ compile_rec e ^ ")->'" ^ l ^ "')"
-	| In(Let(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), e1))
-	| In(LetRec(x, t, e1), e2) -> compile_rec(Application(Abstraction(x, t, e2), Fix(Abstraction(x, t, e1))))
+	| In(Let(x, t, e1), e2) ->
+		compile_rec(Application((Abstraction(x, t, e2), dummy_t), e1), dummy_t)
+	| In(LetRec(x, t, e1), e2) ->
+		let fix = Fix((Abstraction(x, t, e1), dummy_t)), dummy_t in
+		compile_rec(Application((Abstraction(x, t, e2), dummy_t), fix), dummy_t)
 	| Error e -> "(throw(Exception.new(\"" ^ e ^ "\")))"
 	| Constructor x -> "\"" ^ x ^ "\""
 	| ConstructorMember(_, _)
