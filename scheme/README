@@ -1,0 +1,8 @@
+This directory contains implementations of a Scheme-like language in a variety
+of programming languages. I'm using this to refresh and expand my knowledge of
+these languages and to learn some new concepts, such as hand-writing a parser.
+
+The variation of Scheme implemented isn't close to any real version of Scheme;
+for example, the semantics used here for macros are my own invention. In some
+languages, I have only implemented a subset of even this limited version of
+Scheme.
