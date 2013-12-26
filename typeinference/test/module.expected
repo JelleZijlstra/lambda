@@ -1,0 +1,10 @@
+%%stdout%%
+42
+Result: module
+	let __result__ = module
+	let is_some = \o. match o with None -> false | Some _ -> true
+	let deoptionalize = \o. \dflt : 'typevar1. match o with None -> dflt | Some v -> v
+	let __result__ = ()
+end
+end
+%%stderr%%

@@ -1,0 +1,5 @@
+%%stdout%%
+Result: module
+	let __result__ = (false, \e. match e with Left n -> n = 1 | Right b -> b)
+end
+%%stderr%%

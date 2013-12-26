@@ -1,0 +1,5 @@
+%%stdout%%
+Result: module
+	let __result__ = (Bar 3)
+end
+%%stderr%%

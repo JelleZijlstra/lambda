@@ -1,0 +1,7 @@
+%%stdout%%
+3
+0
+Result: module
+	let __result__ = ((), ())
+end
+%%stderr%%

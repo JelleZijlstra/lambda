@@ -1,0 +1,6 @@
+%%stdout%%
+5040
+Result: module
+	let __result__ = 720
+end
+%%stderr%%

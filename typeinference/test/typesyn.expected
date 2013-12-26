@@ -1,0 +1,3 @@
+%%stdout%%
+Error: Cannot unify kinds: * and (* -> kindvar4)
+%%stderr%%

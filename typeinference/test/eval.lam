@@ -1,0 +1,14 @@
+data node =
+	Add node node
+	| Mult node node
+	| Literal int
+
+let rec eval = \n. match n with {
+	Add n1 n2 -> (eval n1) + (eval n2)
+	| Mult n1 n2 -> (eval n1) * (eval n2)
+	| Literal n -> n
+}
+
+;;
+
+print (eval (Add (Literal 1) (Literal 2)))

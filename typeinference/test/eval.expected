@@ -1,0 +1,7 @@
+%%stdout%%
+3
+Result: module
+	let eval = \n. match n with Add n1 n2 -> eval n1 + eval n2 | Mult n1 n2 -> eval n1 * eval n2 | Literal n -> n
+	let __result__ = ()
+end
+%%stderr%%

@@ -202,10 +202,84 @@ class nullf(lib_function):
 	def call(self, args):
 		self.ensure_args(args, 1)
 		self.ensure_arg_type(args, 0, ast.slist)
-		if len(args[0].lst) == 0:
-			return ast.true
-		else:
-			return ast.false
+		return ast.scm_bool(len(args[0].lst) == 0)
+
+class listf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.slist))
+
+class stringf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and args[0].tkn == T_STRING)
+
+class charf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		# we don't actually have a char type
+		return ast.false
+
+class numberf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and args[0].tkn != T_STRING and args[0].tkn != T_BOOL)
+
+class integerf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and args[0].tkn == T_INT)
+
+class rationalf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and (args[0].tkn == T_INT or args[0].tkn == T_RATIONAL))
+
+class realf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and (args[0].tkn == T_INT or args[0].tkn == T_RATIONAL or args[0].tkn == T_FLOAT))
+
+class complexf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and args[0].tkn != T_STRING and args[0].tkn != T_BOOL)
+
+class integerf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and args[0].tkn == T_INT)
+
+class booleanf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.literal) and args[0].tkn == T_BOOL)
+
+class symbolf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.name))
+
+class proceduref(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 1)
+		return ast.scm_bool(isinstance(args[0], ast.function) or isinstance(args[0], lib_function))
+
+class ltf(lib_function):
+	def call(self, args):
+		self.ensure_args(args, 2)
+		self.ensure_arg_type(args, 0, ast.literal)
+		self.ensure_arg_type(args, 1, ast.literal)
+		if x.tkn != y.tkn:
+			raise(runtime_error("+: arguments must have same type"))
+		if x.tkn == T_INT or x.tkn == T_FLOAT:
+			return ast.scm_bool(x.content < y.content)
+		elif x.tkn == T_RATIONAL:
+			x1, x2 = x.content
+			y1, y2 = y.content
+			return ast.scm_bool(x1 / x2 < y1 / y2)
+		elif x.tkn == T_COMPLEX:
+			raise(runtime_error("+: cannot compare complex numbers"))
 
 lib_macros = {
 	"lambda": lambdam(),
@@ -226,4 +300,16 @@ lib_names = {
 	"cdr": cdrf(),
 	"append": appendf(),
 	"null?": nullf(),
+	"list?": listf(),
+	"string?": stringf(),
+	"char?": charf(),
+	"number?": numberf(),
+	"integer?": integerf(),
+	"rational?": rationalf(),
+	"real?": realf(),
+	"complex?": complexf(),
+	"boolean?": booleanf(),
+	"symbol?": symbolf(),
+	"procedure?": proceduref(),
+	"<": ltf(),
 }

@@ -1,0 +1,5 @@
+%%stdout%%
+Result: module
+	let __result__ = ((\x. type option a = None  | Some 'a in let f' : 'option/0 int -> int = \x : 'typevar1. match x with None -> 3 | Some v -> v + 1 in (f' None, f' (Some x)), \x. type option a b = None 'a | Some 'b in let f' : forall typevar24. 'option/2 int 'typevar24 -> int = \x : 'typevar15. match x with Some _ -> 4 | None v -> v - 1 in (f' (Some true), f' (None x))), ((3, 4), (4, 3)))
+end
+%%stderr%%

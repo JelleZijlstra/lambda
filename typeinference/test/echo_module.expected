@@ -1,0 +1,28 @@
+%%stdout%%
+module
+	let split = \f. \lst : 'typevar84. let rec split' : forall typevar94. 'list/0 'typevar94 -> 'list/0 'typevar94 -> 'list/0 'typevar94 -> ('list/0 'typevar94 * 'list/0 'typevar94) = \lst : 'typevar86. \l : 'typevar87. \r : 'typevar88. match lst with Nil -> (l, r) | Cons hd tl -> let rest : forall typevar97. 'typevar97 = split' tl l r in let l' : forall typevar100. 'typevar100 = fst rest in let r' : forall typevar105. 'typevar105 = snd rest in if f hd then (Cons hd l', r') else (l', Cons hd r') in split' lst Nil Nil
+	let reverse = \l. match l with Nil -> u | Cons hd tl -> fold_right f (f hd u) tl
+	let rev_append = \l1. \l2 : 'typevar56. match l1 with Nil -> l2 | Cons hd tl -> rev_append tl (Cons hd l2)
+	let qsort = \lst. match lst with Nil -> Nil | Cons hd Nil -> Cons hd Nil | Cons hd tl -> let ls : forall typevar135. ('list 'typevar135 * 'list 'typevar135) = split \x : 'typevar137. x < hd tl in append (qsort fst ls) (Cons hd (qsort snd ls))
+	let map = \f. fold_left \hd : 'typevar44. \rest : 'typevar45. Cons (f hd) rest Nil
+	let length = \l. match l with Nil -> u | Cons hd tl -> f hd (fold_left f u tl)
+	let fold_right = \f. \u : 'typevar18. \l : 'typevar19. match l with Nil -> u | Cons hd tl -> fold_right f (f hd u) tl
+	let fold_left = \f. \u : 'typevar2. \l : 'typevar3. match l with Nil -> u | Cons hd tl -> f hd (fold_left f u tl)
+	let filter = \f. fold_left \e : 'typevar179. \lst : 'typevar180. if f e then Cons e lst else lst
+	let append = \l1. \l2 : 'typevar76. rev_append (reverse l1) l2
+endResult: module
+	let listm = module
+	let split = \f. \lst : 'typevar84. let rec split' : forall typevar94. 'list/0 'typevar94 -> 'list/0 'typevar94 -> 'list/0 'typevar94 -> ('list/0 'typevar94 * 'list/0 'typevar94) = \lst : 'typevar86. \l : 'typevar87. \r : 'typevar88. match lst with Nil -> (l, r) | Cons hd tl -> let rest : forall typevar97. 'typevar97 = split' tl l r in let l' : forall typevar100. 'typevar100 = fst rest in let r' : forall typevar105. 'typevar105 = snd rest in if f hd then (Cons hd l', r') else (l', Cons hd r') in split' lst Nil Nil
+	let reverse = \l. match l with Nil -> u | Cons hd tl -> fold_right f (f hd u) tl
+	let rev_append = \l1. \l2 : 'typevar56. match l1 with Nil -> l2 | Cons hd tl -> rev_append tl (Cons hd l2)
+	let qsort = \lst. match lst with Nil -> Nil | Cons hd Nil -> Cons hd Nil | Cons hd tl -> let ls : forall typevar135. ('list 'typevar135 * 'list 'typevar135) = split \x : 'typevar137. x < hd tl in append (qsort fst ls) (Cons hd (qsort snd ls))
+	let map = \f. fold_left \hd : 'typevar44. \rest : 'typevar45. Cons (f hd) rest Nil
+	let length = \l. match l with Nil -> u | Cons hd tl -> f hd (fold_left f u tl)
+	let fold_right = \f. \u : 'typevar18. \l : 'typevar19. match l with Nil -> u | Cons hd tl -> fold_right f (f hd u) tl
+	let fold_left = \f. \u : 'typevar2. \l : 'typevar3. match l with Nil -> u | Cons hd tl -> f hd (fold_left f u tl)
+	let filter = \f. fold_left \e : 'typevar179. \lst : 'typevar180. if f e then Cons e lst else lst
+	let append = \l1. \l2 : 'typevar76. rev_append (reverse l1) l2
+end
+	let __result__ = ()
+end
+%%stderr%%

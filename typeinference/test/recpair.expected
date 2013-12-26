@@ -1,0 +1,3 @@
+%%stdout%%
+Error: Cannot unify types: 'typevar0 and (int * 'typevar0)
+%%stderr%%
