@@ -10,3 +10,5 @@
         (+ 1 (length (cdr lst))))))))
 
 (print (length '(1 2 3)))
+(print (length '()))
+(print (length '(1)))

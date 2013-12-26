@@ -1,0 +1,10 @@
+[
+    {
+        "name": "ocaml",
+        "executable": "ocamlscheme"
+    },
+    {
+        "name": "python",
+        "executable": "main.py"
+    }
+]
