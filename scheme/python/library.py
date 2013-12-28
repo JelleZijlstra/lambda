@@ -109,7 +109,7 @@ class user_defined_macro(lib_macro):
 
 	def call(self, args, context):
 		new_context = copy.copy(self.define_context)
-		new_context.set_meval_context(context)
+		new_context.meval_context = context
 		ast.set_params(self.params, args, new_context)
 		return self.body.eval(new_context)
 
