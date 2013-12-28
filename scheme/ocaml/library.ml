@@ -3,34 +3,34 @@ open Ast
 exception RuntimeError of string
 
 let lambda : library_macro = fun args env -> match args with
-    | [List(params); body] -> Closure(params, env, body), env
+    | List params::tl -> Closure(params, env, StatementList tl), env
     | _ -> raise (RuntimeError "lambda: invalid arguments")
 
 let define : library_macro = fun args env -> match args with
-    | [Var name; expr] ->
+    | Var name::tl ->
         if VarMap.mem name env.names then raise (RuntimeError "define: cannot redefine variable");
-        let value, _ = Eval.eval_expr expr env in
+        let value, _ = Eval.eval_expr (StatementList tl) env in
         let env' = Eval.add_to_env name value env in
         value, env'
     | _ -> raise (RuntimeError "define: invalid arguments")
 
 let set : library_macro = fun args env -> match args with
-    | [Var name; expr] ->
-        let value, _ = Eval.eval_expr expr env in
+    | Var name::tl ->
+        let value, _ = Eval.eval_expr (StatementList tl) env in
         let env' = Eval.add_to_env name value env in
         value, env'
     | _ -> raise (RuntimeError "set: invalid arguments")
 
 let letm : library_macro = fun args env -> match args with
-    | [List definitions; expr] ->
+    | List definitions::expr ->
         let foldf env' definition = match definition with
-            | List [Var name; expr] ->
-                let value, _ = Eval.eval_expr expr env in
+            | List(Var name::tl) ->
+                let value, _ = Eval.eval_expr (StatementList tl) env in
                 Eval.add_to_env name value env'
             | _ -> raise (RuntimeError "let: invalid arguments")
         in
         let env' = List.fold_left foldf env definitions in
-        let result, _ = Eval.eval_expr expr env' in
+        let result, _ = Eval.eval_expr (StatementList expr) env' in
         result, env
     | _ -> raise (RuntimeError "let: invalid arguments")
 
@@ -49,11 +49,11 @@ let eval : library_macro = fun args env -> match args with
     | _ -> raise (RuntimeError "if: invalid arguments")
 
 let defmacro : library_macro = fun args define_env -> match args with
-    | [Var name; List params; body] ->
+    | Var name::List params::tl ->
         let new_macro : library_macro = fun args call_env ->
             let define_env' = Eval.set_args params args define_env in
             let define_env'' = {define_env' with meval_context = Some call_env} in
-            Eval.eval_expr body define_env''
+            Eval.eval_expr (StatementList tl) define_env''
         in
         let env = Eval.add_to_env name (LibraryMacro new_macro) define_env in
         LibraryMacro new_macro, env
