@@ -5,3 +5,4 @@ scope.scm
 nested.scm
 statementlist.scm
 define.scm
+sort.scm
