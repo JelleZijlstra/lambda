@@ -9,3 +9,5 @@
 (set! x 3)
 
 (sayit)
+
+(print x)
