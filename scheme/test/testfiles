@@ -1,2 +1,7 @@
 z.scm
 null.scm
+recursion.scm
+scope.scm
+nested.scm
+statementlist.scm
+define.scm

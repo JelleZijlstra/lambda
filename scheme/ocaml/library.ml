@@ -120,7 +120,7 @@ let equals : library_function = fun args -> match args with
 let functions = [
     "lambda", LibraryMacro lambda;
     "define", LibraryMacro define;
-    "set", LibraryMacro set;
+    "set!", LibraryMacro set;
     "let", LibraryMacro letm;
     "if", LibraryMacro ifm;
     "eval", LibraryMacro eval;
