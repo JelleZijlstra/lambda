@@ -12,9 +12,9 @@ type expr =
 	| Closure of expr list * environment * expr
 	| LibraryFunction of library_function
 	| LibraryMacro of library_macro
-and environment = { names : expr VarMap.t; meval_context : environment option }
+and environment = expr Environment.env
 and library_function = expr list -> expr
-and library_macro = expr list -> environment -> expr * environment
+and library_macro = expr list -> environment -> expr
 
 let rec join glue lst = match lst with
 	| [] -> ""
