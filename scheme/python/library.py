@@ -25,6 +25,11 @@ class lib_proc(object):
 			msg = "%s: %d arguments provided, but %d were expected" % (self.get_name(), len(args), n)
 			raise(ast.runtime_error(msg))
 
+	def ensure_args_gt(self, args, n):
+		if len(args) < n:
+			msg = "%s: %d arguments provided, but at least %d were expected" % (self.get_name(), len(args), n)
+			raise(ast.runtime_error(msg))
+
 	def eval(self, context):
 		return self
 
@@ -34,9 +39,9 @@ class lib_macro(lib_proc):
 
 class lambdam(lib_macro):
 	def call(self, args, context):
-		self.ensure_args(args, 2)
+		self.ensure_args_gt(args, 2)
 		self.ensure_arg_type(args, 0, ast.slist)
-		code = args[1]
+		code = ast.statement_list(args[1:])
 		params = []
 		for elem in args[0].lst:
 			if isinstance(elem, ast.dotted_name):
@@ -48,36 +53,36 @@ class lambdam(lib_macro):
 
 class definem(lib_macro):
 	def call(self, args, context):
-		self.ensure_args(args, 2)
+		self.ensure_args_gt(args, 2)
 		self.ensure_arg_type(args, 0, ast.name)
 		name = args[0].name
 		if context.has_name(name):
 			raise ast.runtime_error("define: cannot redefine variable %s" % name)
-		value = args[1].eval(context)
+		value = ast.statement_list(args[1:]).eval(context)
 		context.add_name(name, value)
 		return value
 
 class setm(lib_macro):
 	def call(self, args, context):
-		self.ensure_args(args, 2)
+		self.ensure_args_gt(args, 2)
 		self.ensure_arg_type(args, 0, ast.name)
 		name = args[0].name
-		value = args[1].eval(context)
+		value = ast.statement_list(args[1:]).eval(context)
 		context.add_name(name, value)
 		return value
 
 class letm(lib_macro):
 	def call(self, args, context):
-		self.ensure_args(args, 2)
+		self.ensure_args_gt(args, 2)
 		self.ensure_arg_type(args, 0, ast.slist)
 		new_context = copy.copy(context)
 		for pair in args[0].lst:
 			self.ensure_type(pair, ast.slist)
 			name = pair.lst[0]
 			self.ensure_type(name, ast.name)
-			code = pair.lst[1]
+			code = ast.statement_list(pair.lst[1:])
 			new_context.add_name(name.name, code.eval(context))
-		return args[1].eval(new_context)
+		return ast.statement_list(args[1:]).eval(new_context)
 
 class ifm(lib_macro):
 	def call(self, args, context):
@@ -109,12 +114,12 @@ class user_defined_macro(lib_macro):
 
 class defmacrom(lib_macro):
 	def call(self, args, context):
-		self.ensure_args(args, 3)
+		self.ensure_args_gt(args, 3)
 		self.ensure_arg_type(args, 0, ast.name)
 		name = args[0].name
 		self.ensure_arg_type(args, 1, ast.slist)
 		params = args[1].lst
-		body = args[2]
+		body = ast.statement_list(args[2:])
 		macro = user_defined_macro(params, body, context)
 		context.add_macro(name, macro)
 		return macro
