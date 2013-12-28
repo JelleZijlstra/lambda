@@ -128,7 +128,7 @@ class defmacrom(lib_macro):
 class mevalm(lib_macro):
 	def call(self, args, context):
 		self.ensure_args(args, 1)
-		return args[0].eval(context.get_meval_context())
+		return args[0].eval(context).eval(context.meval_context)
 
 class lib_function(lib_proc, ast.function):
 	def __init__(self):
