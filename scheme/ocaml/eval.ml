@@ -41,7 +41,8 @@ let rec eval_expr (e : expr) (env : environment) : expr * environment =
 		| Closure(params, env', body) ->
 			let args = List.map (fun e -> let e', _ = eval_expr e env in e') tl in
 			let env'' = set_args params args env' in
-			eval_expr body env''
+			let result, _ = eval_expr body env'' in
+			result, env
 		| _ -> raise (RuntimeError "This expression is not a function; it cannot be applied")
 
 
