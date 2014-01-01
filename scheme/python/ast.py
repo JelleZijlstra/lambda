@@ -18,8 +18,7 @@ class quoted(expr):
 		self.expr = e
 
 	def pretty_print(self):
-		put("'")
-		self.expr.pretty_print()
+		return "'" + self.expr.pretty_print()
 
 	def eval(self, context):
 		return self.expr
@@ -32,21 +31,20 @@ class literal(expr):
 
 	def pretty_print(self):
 		if self.tkn == T_STRING:
-			string = '"' + self.content.replace('"', '\\"') + '"'
+			return '"' + self.content.replace('"', '\\"') + '"'
 		elif self.tkn == T_INT or self.tkn == T_FLOAT:
-			string = str(self.content)
+			return str(self.content)
 		elif self.tkn == T_RATIONAL:
 			num, denom = self.content
-			string = str(num) + '/' + str(denom)
+			return str(num) + '/' + str(denom)
 		elif self.tkn == T_COMPLEX:
 			real, imag = self.content
-			string = str(real) + '+' + str(imag) + 'i'
+			return str(real) + '+' + str(imag) + 'i'
 		elif self.tkn == T_BOOL:
 			if self.content:
-				string = "#t"
+				return "#t"
 			else:
-				string = "#f"
-		put(string)
+				return "#f"
 
 	def eval(self, context):
 		return self
@@ -57,11 +55,7 @@ class slist(expr):
 		self.lst = lst
 
 	def pretty_print(self):
-		put("(")
-		for elem in self.lst:
-			elem.pretty_print()
-			put(" ")
-		put(")")
+		return '(' + ' '.join(elem.pretty_print() for elem in self.lst) + ')'
 
 	def eval(self, context):
 		if len(self.lst) < 1:
@@ -80,9 +74,7 @@ class statement_list(object):
 		self.prgrm = prgrm
 
 	def pretty_print(self):
-		for line in self.prgrm:
-			line.pretty_print()
-			put("\n")
+		return ''.join(line.pretty_print() + '\n' for line in self.prgrm)
 
 	def eval(self, context):
 		for line in self.prgrm:
@@ -95,7 +87,7 @@ class name(expr):
 		self.name = nm
 
 	def pretty_print(self):
-		put(self.name)
+		return self.name
 
 	def eval(self, context):
 		try:
@@ -130,7 +122,7 @@ class function(expr):
 		return self
 
 	def pretty_print(self):
-		put("#{procedure}")
+		return "#{procedure}"
 
 class dotted_name(expr):
 	def __init__(self, name):
@@ -140,7 +132,7 @@ class dotted_name(expr):
 		raise runtime_error("cannot call dotted_name")
 
 	def pretty_print(self):
-		put(" . %s" % self.name)
+		return " . %s" % self.name
 
 # common objects
 nil = slist([])

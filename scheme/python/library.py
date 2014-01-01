@@ -36,7 +36,7 @@ class lib_proc(object):
 
 class lib_macro(lib_proc):
 	def pretty_print(self):
-		print("#{macro}", end="")
+		return "#{macro}"
 
 class lambdam(lib_macro):
 	def call(self, args, context):
@@ -137,8 +137,7 @@ class lib_function(lib_proc, ast.function):
 class printf(lib_function):
 	def call(self, args):
 		for arg in args:
-			arg.pretty_print()
-			print()
+			print(arg.pretty_print())
 		return ast.nil
 
 class carf(lib_function):
