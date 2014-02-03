@@ -66,7 +66,7 @@ def do_parse_program(it):
 	while True:
 		c, cnt = it.peek()
 		if c == T_EOF:
-			return program(prgrm)
+			return statement_list(prgrm)
 		else:
 			prgrm.append(do_parse(it))
 

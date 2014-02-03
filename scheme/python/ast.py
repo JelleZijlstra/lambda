@@ -74,7 +74,7 @@ class slist(expr):
 		args = evaled[1:]
 		return fn.call(args)
 
-class program(object):
+class statement_list(object):
 	def __init__(self, prgrm):
 		super().__init__()
 		self.prgrm = prgrm
@@ -86,7 +86,8 @@ class program(object):
 
 	def eval(self, context):
 		for line in self.prgrm:
-			line.eval(context)
+			result = line.eval(context)
+		return result
 
 class name(expr):
 	def __init__(self, nm):

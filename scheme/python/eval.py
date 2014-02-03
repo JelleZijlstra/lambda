@@ -1,9 +1,10 @@
 import ast
 import copy
 import library
+import os.path
 import parser
 
-LIBRARY_FILE = "library.scm"
+LIBRARY_FILE = os.path.join(os.path.dirname(__file__), "../common/library.scm")
 
 class context(object):
 	def __init__(self, names, macros, meval_context = None):
