@@ -19,7 +19,7 @@ let set : library_macro = fun args env -> match args with
         let value = Eval.eval (StatementList tl) env in
         Environment.set env name value;
         value
-    | _ -> raise (RuntimeError "set: invalid arguments")
+    | _ -> raise (RuntimeError "set!: invalid arguments")
 
 let letm : library_macro = fun args env -> match args with
     | List definitions::expr ->
@@ -43,7 +43,7 @@ let ifm : library_macro = fun args env -> match args with
 
 let eval : library_macro = fun args env -> match args with
     | [expr] -> Eval.eval (Eval.eval expr env) env
-    | _ -> raise (RuntimeError "if: invalid arguments")
+    | _ -> raise (RuntimeError "eval: invalid arguments")
 
 let defmacro : library_macro = fun args define_env -> match args with
     | Var name::List params::tl ->
@@ -58,7 +58,7 @@ let defmacro : library_macro = fun args define_env -> match args with
 
 let meval : library_macro = fun args env -> match args, Environment.get_meval env with
     | [expr], Some env' -> Eval.eval (Eval.eval expr env) env'
-    | _ -> raise (RuntimeError "if: invalid arguments")
+    | _ -> raise (RuntimeError "meval: invalid arguments")
 
 let print : library_function = fun args ->
     List.iter (fun arg -> Printf.printf "%s" (Ast.string_of_expr arg ^ "\n")) args;
