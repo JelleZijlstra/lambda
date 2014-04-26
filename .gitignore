@@ -12,8 +12,9 @@ jc
 ljs
 parser.output
 *.hi
-parser.hs
+hslam/parser.hs
 lexer.hs
 hslam
+hsscheme
 *.pyc
 __pycache__/*
