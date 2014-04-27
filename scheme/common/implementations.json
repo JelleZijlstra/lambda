@@ -6,5 +6,9 @@
     {
         "name": "python",
         "executable": "main.py"
+    },
+    {
+        "name": "haskell",
+        "executable": "HsScheme"
     }
 ]

@@ -37,11 +37,12 @@ lambda _ _ = fail "lambda: invalid arguments"
 define :: LibraryMacro
 define (Var name:tl) env = do
     current <- envHas env name
-    if current then fail "define: cannot redefine variable"
-    else do
-        value <- eval (StatementList tl) env
-        setEnv env name value
-        return value
+    if current
+        then fail "define: cannot redefine variable"
+        else do
+            value <- eval (StatementList tl) env
+            setEnv env name value
+            return value
 define _ _ = fail "define: invalid arguments"
 
 set :: LibraryMacro

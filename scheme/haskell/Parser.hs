@@ -8,6 +8,7 @@ parseScheme :: String -> String -> Either ParseError Expr
 parseScheme text file = parse schemeFile file text
 
 schemeFile = do
+    ignored
     lst <- statementList
     eof
     return lst
