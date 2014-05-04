@@ -1,4 +1,5 @@
 import copy
+import eval
 
 from lexer import *
 
@@ -17,8 +18,7 @@ class quoted(expr):
 		self.expr = e
 
 	def pretty_print(self):
-		put("'")
-		self.expr.pretty_print()
+		return "'" + self.expr.pretty_print()
 
 	def eval(self, context):
 		return self.expr
@@ -31,21 +31,20 @@ class literal(expr):
 
 	def pretty_print(self):
 		if self.tkn == T_STRING:
-			string = '"' + self.content.replace('"', '\\"') + '"'
+			return '"' + self.content.replace('"', '\\"') + '"'
 		elif self.tkn == T_INT or self.tkn == T_FLOAT:
-			string = str(self.content)
+			return str(self.content)
 		elif self.tkn == T_RATIONAL:
 			num, denom = self.content
-			string = str(num) + '/' + str(denom)
+			return str(num) + '/' + str(denom)
 		elif self.tkn == T_COMPLEX:
 			real, imag = self.content
-			string = str(real) + '+' + str(imag) + 'i'
+			return str(real) + '+' + str(imag) + 'i'
 		elif self.tkn == T_BOOL:
 			if self.content:
-				string = "#t"
+				return "#t"
 			else:
-				string = "#f"
-		put(string)
+				return "#f"
 
 	def eval(self, context):
 		return self
@@ -56,23 +55,18 @@ class slist(expr):
 		self.lst = lst
 
 	def pretty_print(self):
-		put("(")
-		for elem in self.lst:
-			elem.pretty_print()
-			put(" ")
-		put(")")
+		return '(' + ' '.join(elem.pretty_print() for elem in self.lst) + ')'
 
 	def eval(self, context):
 		if len(self.lst) < 1:
 			raise runtime_error("Empty list cannot be eval'ed")
-		fst = self.lst[0]
-		if isinstance(fst, name) and context.has_macro(fst.name):
-			return context.get_macro(fst.name).call(self.lst[1:], context)
+		fn = self.lst[0].eval(context)
+		args = self.lst[1:]
 
-		evaled = [elem.eval(context) for elem in self.lst]
-		fn = evaled[0]
-		args = evaled[1:]
-		return fn.call(args)
+		if isinstance(fn, function):
+			return fn.call([elem.eval(context) for elem in args])
+		else:
+			return fn.call(args, context)
 
 class statement_list(object):
 	def __init__(self, prgrm):
@@ -80,9 +74,7 @@ class statement_list(object):
 		self.prgrm = prgrm
 
 	def pretty_print(self):
-		for line in self.prgrm:
-			line.pretty_print()
-			put("\n")
+		return ''.join(line.pretty_print() + '\n' for line in self.prgrm)
 
 	def eval(self, context):
 		for line in self.prgrm:
@@ -95,39 +87,22 @@ class name(expr):
 		self.name = nm
 
 	def pretty_print(self):
-		put(self.name)
+		return self.name
 
 	def eval(self, context):
-		if context.has_macro(self.name):
-			return captured_macro(context.get_macro(self.name), context)
 		try:
-			return context.get_name(self.name)
+			return context.get(self.name)
 		except KeyError:
 			raise(runtime_error("Unbound variable: %s" % self.name))
-
-class captured_macro(expr):
-	def __init__(self, macro, context):
-		super().__init__()
-		self.macro = macro
-		self.context = context
-
-	def call(self, args):
-		return self.macro.call(args, self.context)
-
-	def eval(self, context):
-		return self
-
-	def pretty_print(self):
-		self.macro.pretty_print()
 
 def set_params(params, args, context):
 	for index, name in enumerate(params):
 		if isinstance(name, dotted_name):
 			value = slist(args[index:])
-			context.add_name(name.name, value)
+			context.set(name.name, value)
 			break
 		try:
-			context.add_name(name, args[index])
+			context.set(name, args[index])
 		except IndexError:
 			raise runtime_error("Invalid number of arguments")
 
@@ -139,7 +114,7 @@ class function(expr):
 		self.context = context
 
 	def call(self, args):
-		new_context = copy.copy(self.context)
+		new_context = eval.context(parent=self.context, meval_context=self.context.meval_context)
 		set_params(self.params, args, new_context)
 		return self.code.eval(new_context)
 
@@ -147,7 +122,7 @@ class function(expr):
 		return self
 
 	def pretty_print(self):
-		put("#{procedure}")
+		return "#{procedure}"
 
 class dotted_name(expr):
 	def __init__(self, name):
@@ -157,7 +132,7 @@ class dotted_name(expr):
 		raise runtime_error("cannot call dotted_name")
 
 	def pretty_print(self):
-		put(" . %s" % self.name)
+		return " . %s" % self.name
 
 # common objects
 nil = slist([])

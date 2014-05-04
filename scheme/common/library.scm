@@ -5,6 +5,9 @@
 
 (define not (lambda (arg) (if arg #f #t)))
 
+(define >= (lambda (a b)
+    (not (< a b))))
+
 (define apply (lambda (f args) (eval (cons f args))))
 
 (defmacro and (. xs)

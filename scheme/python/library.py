@@ -3,6 +3,7 @@ import fractions
 import functools
 
 import ast
+import eval
 from lexer import *
 
 class lib_proc(object):
@@ -35,7 +36,7 @@ class lib_proc(object):
 
 class lib_macro(lib_proc):
 	def pretty_print(self):
-		print("#{macro}", end="")
+		return "#{macro}"
 
 class lambdam(lib_macro):
 	def call(self, args, context):
@@ -56,10 +57,10 @@ class definem(lib_macro):
 		self.ensure_args_gt(args, 2)
 		self.ensure_arg_type(args, 0, ast.name)
 		name = args[0].name
-		if context.has_name(name):
+		if context.has(name):
 			raise ast.runtime_error("define: cannot redefine variable %s" % name)
 		value = ast.statement_list(args[1:]).eval(context)
-		context.add_name(name, value)
+		context.set(name, value)
 		return value
 
 class setm(lib_macro):
@@ -68,20 +69,20 @@ class setm(lib_macro):
 		self.ensure_arg_type(args, 0, ast.name)
 		name = args[0].name
 		value = ast.statement_list(args[1:]).eval(context)
-		context.add_name(name, value)
+		context.set(name, value)
 		return value
 
 class letm(lib_macro):
 	def call(self, args, context):
 		self.ensure_args_gt(args, 2)
 		self.ensure_arg_type(args, 0, ast.slist)
-		new_context = copy.copy(context)
+		new_context = eval.context(parent=context, meval_context=context.meval_context)
 		for pair in args[0].lst:
 			self.ensure_type(pair, ast.slist)
 			name = pair.lst[0]
 			self.ensure_type(name, ast.name)
 			code = ast.statement_list(pair.lst[1:])
-			new_context.add_name(name.name, code.eval(context))
+			new_context.set(name.name, code.eval(context))
 		return ast.statement_list(args[1:]).eval(new_context)
 
 class ifm(lib_macro):
@@ -108,7 +109,7 @@ class user_defined_macro(lib_macro):
 
 	def call(self, args, context):
 		new_context = copy.copy(self.define_context)
-		new_context.set_meval_context(context)
+		new_context.meval_context = context
 		ast.set_params(self.params, args, new_context)
 		return self.body.eval(new_context)
 
@@ -121,23 +122,22 @@ class defmacrom(lib_macro):
 		params = args[1].lst
 		body = ast.statement_list(args[2:])
 		macro = user_defined_macro(params, body, context)
-		context.add_macro(name, macro)
+		context.set(name, macro)
 		return macro
 
 class mevalm(lib_macro):
 	def call(self, args, context):
 		self.ensure_args(args, 1)
-		return args[0].eval(context.get_meval_context())
+		return args[0].eval(context).eval(context.meval_context)
 
-class lib_function(lib_proc):
-	def pretty_print(self):
-		print("#{procedure}", end="")
+class lib_function(lib_proc, ast.function):
+	def __init__(self):
+		pass
 
 class printf(lib_function):
 	def call(self, args):
 		for arg in args:
-			arg.pretty_print()
-			print()
+			print(arg.pretty_print())
 		return ast.nil
 
 class carf(lib_function):
@@ -275,6 +275,7 @@ class ltf(lib_function):
 		self.ensure_args(args, 2)
 		self.ensure_arg_type(args, 0, ast.literal)
 		self.ensure_arg_type(args, 1, ast.literal)
+		x, y = args
 		if x.tkn != y.tkn:
 			raise(runtime_error("+: arguments must have same type"))
 		if x.tkn == T_INT or x.tkn == T_FLOAT:
@@ -286,7 +287,7 @@ class ltf(lib_function):
 		elif x.tkn == T_COMPLEX:
 			raise(runtime_error("+: cannot compare complex numbers"))
 
-lib_macros = {
+library = {
 	"lambda": lambdam(),
 	"define": definem(),
 	"set!": setm(),
@@ -295,9 +296,6 @@ lib_macros = {
 	"eval": evalm(),
 	"defmacro": defmacrom(),
 	"meval": mevalm(),
-}
-
-lib_names = {
 	"print": printf(),
 	"+": plusf(),
 	"cons": consf(),

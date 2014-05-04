@@ -5,3 +5,6 @@ scope.scm
 nested.scm
 statementlist.scm
 define.scm
+sort.scm
+use_library.scm
+and.scm
