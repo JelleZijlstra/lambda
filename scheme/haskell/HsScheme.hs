@@ -24,7 +24,7 @@ executeFile :: Environment -> String -> IO ()
 executeFile env file = do
     text <- readFile file
     case parseScheme text file of
-        Left err -> putStrLn $ show err
+        Left err -> print err
         Right expr -> do
             eval expr env
             return ()

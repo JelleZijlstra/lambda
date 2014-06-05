@@ -38,9 +38,9 @@ instance Show Expr where
     show (String s) = "\"" ++ s ++ "\""
     show (Quoted e) = "'" ++ show e
     show (Dotted e) = ". " ++ show e
-    show (StatementList l) = intercalate " " $ map show l
-    show (List l) = "(" ++ intercalate " " (map show l) ++ ")"
-    show (Closure _ _ _) = "<closure>"
+    show (StatementList l) = unwords $ map show l
+    show (List l) = "(" ++ unwords (map show l) ++ ")"
+    show (Closure {}) = "<closure>"
     show (LibraryFunction _) = "<built-in function>"
     show (LibraryMacro _) = "<built-in macro>"
 

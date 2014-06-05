@@ -6,7 +6,7 @@ eval :: Expr -> Environment -> IO Expr
 eval (Integer i) _ = return $ Integer i
 eval (String s) _ = return $ String s
 eval (Bool b) _ = return $ Bool b
-eval fn@(Closure _ _ _) _ = return fn
+eval fn@(Closure {}) _ = return fn
 eval fn@(LibraryFunction _) _ = return fn
 eval fn@(LibraryMacro _) _ = return fn
 
@@ -31,11 +31,11 @@ eval (List (hd:tl)) env = do
     fn <- eval hd env
     case fn of
         LibraryFunction lf -> do
-            args <- mapM (flip eval env) tl
+            args <- mapM (`eval` env) tl
             lf args
         LibraryMacro lm -> lm tl env
         Closure params savedEnv body -> do
-            args <- mapM (flip eval env) tl
+            args <- mapM (`eval` env) tl
             newEnv <- makeEnv (Just savedEnv) Nothing
             setArgs params args newEnv
             eval body newEnv

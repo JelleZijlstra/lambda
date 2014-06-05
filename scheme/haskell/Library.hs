@@ -39,10 +39,7 @@ define (Var name:tl) env = do
     current <- envHas env name
     if current
         then fail "define: cannot redefine variable"
-        else do
-            value <- eval (StatementList tl) env
-            setEnv env name value
-            return value
+        else set (Var name:tl) env
 define _ _ = fail "define: invalid arguments"
 
 set :: LibraryMacro
@@ -90,17 +87,16 @@ defmacro (Var name:List params:tl) definitionEnv = do
                 eval (StatementList tl) newEnv
 
 meval :: LibraryMacro
-meval [expr] env = do
-    case mevalEnv env of
-        Nothing -> fail "meval: invalid arguments"
-        Just env' -> do
-            toEval <- eval expr env
-            eval toEval env'
+meval [expr] env = case mevalEnv env of
+    Nothing -> fail "meval: invalid arguments"
+    Just env' -> do
+        toEval <- eval expr env
+        eval toEval env'
 meval _ _ = fail "meval: invalid arguments"
 
 printFn :: LibraryFunction
 printFn args = do
-    mapM_ (\arg -> putStrLn $ show arg) args
+    mapM_ print args
     return $ List []
 
 car :: LibraryFunction

@@ -24,8 +24,8 @@ list = do
 atom = try bool <|> try stringLiteral <|> try integer <|> try list <|> try quoted <|> try dotted <|> try identifier
 
 identifier = do
-    firstChar <- noneOf $ whitespaceChars ++ ['0'..'9'] ++ ['(', ')', ';', '.', '\'']
-    rest <- many $ noneOf $ whitespaceChars ++ ['(', ')']
+    firstChar <- noneOf $ whitespaceChars ++ ['0'..'9'] ++ "();.'"
+    rest <- many $ noneOf $ whitespaceChars ++ "()"
     return $ Var $ firstChar:rest
 
 stringLiteral = do
@@ -63,9 +63,9 @@ whitespace = do
 
 comment = do
     char ';'
-    many $ noneOf ['\n']
+    many $ noneOf "\n"
 
-whitespaceChars = ['\n', '\t', '\r', ' ']
+whitespaceChars = "\n\t\r "
 
 -- This is given as (<*) in Real World Haskell but it doesn't seem to exist in the current version of Parsec
 returnLeft left right = do
