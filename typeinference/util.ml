@@ -17,3 +17,5 @@ let find_module modul loc =
 	(* TODO: search a $PATH *)
 	let name = Filename.concat loc (modul ^ ".lam") in
 	parse_file name, Filename.basename name
+
+let any f = List.fold_left (fun rest item -> rest || f item) false

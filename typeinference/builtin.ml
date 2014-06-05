@@ -18,9 +18,9 @@ let add_strings_f s1 =
 let get_builtins () =
     let m = VarMap.empty in
     (* echo : forall a. a -> () *)
-    let m = VarMap.add "echo" (TForAll(["a"], TFunction(Typevar "a", TUnit)), echo_f) m in
+    let m = VarMap.add "echo" (TForAll(["a"], TFunction(TNamedType "a", TUnit)), echo_f) m in
     (* print : forall a. a -> () *)
-    let m = VarMap.add "print" (TForAll(["a"], TFunction(Typevar "a", TUnit)), print_f) m in
+    let m = VarMap.add "print" (TForAll(["a"], TFunction(TNamedType "a", TUnit)), print_f) m in
     (* add_strings : string -> string -> string *)
     let m = VarMap.add "add_strings" (TFunction(TString, TFunction(TString, TString)), add_strings_f) m in
     m

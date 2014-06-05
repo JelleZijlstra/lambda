@@ -1,19 +1,21 @@
 %{
 	open Ast
 
+	let ut (e : expr) : typed_expr = (e, ref None)
+
 	let rec desugar_let parameter_list body = match parameter_list with
 		| [] -> body
-		| (name, t)::tl -> Abstraction(name, t, desugar_let tl body)
+		| (name, t)::tl -> ut(Abstraction(name, ref t, desugar_let tl body))
 
 	let rec typed_desugar_let parameter_list body body_t = match parameter_list with
 		| [] -> body, body_t
-		| (name, Some t)::tl ->
-			let rest, rest_t = typed_desugar_let tl body body_t in
-			Abstraction(name, Some t, rest), TFunction(t, rest_t)
 		| (name, None)::tl ->
 			let rest, rest_t = typed_desugar_let tl body body_t in
-			let tv = TBoundTypevar (Ast.new_typevar()) in
-			Abstraction(name, Some tv, rest), TFunction(tv, rest_t)
+			let tv = Ast.new_typevar() in
+			Abstraction(name, ref(Some tv), (rest, ref(Some rest_t))), TFunction(tv, rest_t)
+		| (name, Some t)::tl ->
+			let rest, rest_t = typed_desugar_let tl body body_t in
+			Abstraction(name, ref(Some t), (rest, ref(Some rest_t))), TFunction(t, rest_t)
 
 %}
 
@@ -23,12 +25,12 @@
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
 %token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS FORALL STRING STRING_T
 
-%type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr program
-%type<Ast.expr> single_expr
+%type<Ast.typed_expr> expression simple_expr apply_expr plus_expr times_expr program
+%type<Ast.typed_expr> single_expr
 %type<Ast.adt_cons> adt_member
 %type<Ast.adt> adt_list
 %type<Ast.pattern> pattern
-%type<(Ast.pattern * Ast.expr) list> pattern_list
+%type<(Ast.pattern * Ast.typed_expr) list> pattern_list
 %type<string> IDENTIFIER CONSTRUCTOR STRING
 %type<int> INTEGER
 %type<Ast.ltype> type
@@ -37,56 +39,58 @@
 %start program
 %%
 program:
-	| module_body				{ Module(None, $1) }
+	| module_body				{ ut(Module(None, $1)) }
 	| module_type inner_module_body
-								{ Module(Some $1, $2) }
+								{ ut(Module(Some $1, $2)) }
 
 expression:
 	single_expr SEMICOLON expression
-								{ Sequence($1, $3) }
+								{ ut(Sequence($1, $3)) }
 	| single_expr				{ $1 }
 
 
 single_expr:
 	| BACKSLASH IDENTIFIER DOT single_expr
-								{ Abstraction($2, None, $4) }
+								{ ut(Abstraction($2, ref None, $4)) }
 	| BACKSLASH IDENTIFIER COLON type DOT single_expr
-								{ Abstraction($2, Some $4, $6) }
-	| in_expr IN single_expr	{ In($1, $3) }
-	| FST single_expr			{ Projection(false, $2) }
-	| SND single_expr			{ Projection(true, $2) }
+								{ ut(Abstraction($2, ref(Some $4), $6)) }
+	| in_expr IN single_expr	{ ut(In($1, $3)) }
+	| FST single_expr			{ ut(Projection(false, $2)) }
+	| SND single_expr			{ ut(Projection(true, $2)) }
 	| IF expression THEN expression ELSE single_expr
-								{ If($2, $4, $6) }
+								{ ut(If($2, $4, $6)) }
 	| CASE expression OF expression BAR single_expr
-								{ Case($2, $4, $6) }
-	| INL single_expr			{ Injection(false, $2) }
-	| INR single_expr			{ Injection(true, $2) }
-	| FIX single_expr			{ Fix($2) }
-	| BANG single_expr			{ Dereference($2) }
-	| REF single_expr			{ Allocation($2) }
+								{ ut(Case($2, $4, $6)) }
+	| INL single_expr			{ ut(Injection(false, $2)) }
+	| INR single_expr			{ ut(Injection(true, $2)) }
+	| FIX single_expr			{ ut(Fix($2)) }
+	| BANG single_expr			{ ut(Dereference($2)) }
+	| REF single_expr			{ ut(Allocation($2)) }
 	| MATCH expression WITH LBRACE pattern ARROW single_expr pattern_list RBRACE
-								{ Match($2, ($5, $7)::$8) }
+								{ ut(Match($2, ($5, $7)::$8)) }
 	| MATCH expression WITH LBRACE BAR pattern ARROW single_expr pattern_list RBRACE
-								{ Match($2, ($6, $8)::$9) }
+								{ ut(Match($2, ($6, $8)::$9)) }
 	| assign_expr				{ $1 }
 
 in_expr:
 	| LET IDENTIFIER possibly_typed_parameter_list EQUALS expression
-								{ Let($2, None, desugar_let $3 $5) }
+								{ Let($2, ref None, desugar_let $3 $5) }
 	| LET IDENTIFIER possibly_typed_parameter_list COLON type EQUALS expression
 								{
-									let value, t = typed_desugar_let $3 $7 $5 in
-									Let($2, Some t, value)
+									let value, t = typed_desugar_let $3 (Wrapped $7) $5 in
+									let t' = ref (Some t) in
+									Let($2, t', (value, t'))
 								}
 	| LET REC IDENTIFIER possibly_typed_parameter_list EQUALS expression
-								{ LetRec($3, None, desugar_let $4 $6) }
+								{ LetRec($3, ref None, desugar_let $4 $6) }
 	| LET REC IDENTIFIER possibly_typed_parameter_list COLON type EQUALS expression
 								{
-									let value, t = typed_desugar_let $4 $8 $6 in
-									LetRec($3, Some t, value)
+									let value, t = typed_desugar_let $4 (Wrapped $8) $6 in
+									let t' = ref (Some t) in
+									LetRec($3, t', (value, t'))
 								}
 	| DATA IDENTIFIER parameter_list
-								{ LetADT($2, $3, [])}
+								{ LetADT($2, $3, []) }
 	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
 								{ LetADT($2, $3, $5::$6) }
 	| TYPE IDENTIFIER EQUALS type
@@ -96,56 +100,56 @@ in_expr:
 
 assign_expr:
 	equals_expr ASSIGN equals_expr
-								{ Assignment($1, $3) }
+								{ ut(Assignment($1, $3)) }
 	| equals_expr				{ $1 }
 
 equals_expr:
-	plus_expr EQUALS plus_expr	{ Boolbinop(Equals, $1, $3) }
+	plus_expr EQUALS plus_expr	{ ut(Boolbinop(Equals, $1, $3)) }
 	| plus_expr GREATER plus_expr
-								{ Boolbinop(Greater, $1, $3) }
-	| plus_expr LESS plus_expr	{ Boolbinop(Less, $1, $3) }
+								{ ut(Boolbinop(Greater, $1, $3)) }
+	| plus_expr LESS plus_expr	{ ut(Boolbinop(Less, $1, $3)) }
 	| plus_expr					{ $1 }
 
 plus_expr:
-	times_expr PLUS plus_expr	{ Binop(Plus, $1, $3) }
+	times_expr PLUS plus_expr	{ ut(Binop(Plus, $1, $3)) }
 	| times_expr MINUS plus_expr
-								{ Binop(Minus, $1, $3) }
+								{ ut(Binop(Minus, $1, $3)) }
 	| times_expr				{ $1 }
 
 times_expr:
-	apply_expr TIMES times_expr	{ Binop(Times, $1, $3) }
+	apply_expr TIMES times_expr	{ ut(Binop(Times, $1, $3)) }
 	| apply_expr SLASH times_expr
-								{ Binop(Divide, $1, $3) }
+								{ ut(Binop(Divide, $1, $3)) }
 	| apply_expr PERCENT times_expr
-								{ Binop(Modulo, $1, $3) }
+								{ ut(Binop(Modulo, $1, $3)) }
 	| apply_expr				{ $1 }
 
 apply_expr:
-	apply_expr member_expr		{ Application($1, $2) }
+	apply_expr member_expr		{ ut(Application($1, $2)) }
 	| member_expr				{ $1 }
 
 member_expr:
 	| member_expr DOT IDENTIFIER
-								{ Member($1, $3) }
+								{ ut(Member($1, $3)) }
 	| member_expr DOT CONSTRUCTOR
-								{ ConstructorMember($1, $3) }
+								{ ut(ConstructorMember($1, $3)) }
 	| simple_expr				{ $1 }
 
 simple_expr:
 	| LPAREN expression RPAREN	{ $2 }
-	| IDENTIFIER				{ Var($1) }
-	| CONSTRUCTOR				{ Constructor($1) }
-	| INTEGER					{ Int($1) }
-	| BOOLEAN					{ Bool($1) }
-	| STRING					{ String($1) }
+	| IDENTIFIER				{ ut(Var($1)) }
+	| CONSTRUCTOR				{ ut(Constructor($1)) }
+	| INTEGER					{ ut(Int($1)) }
+	| BOOLEAN					{ ut(Bool($1)) }
+	| STRING					{ ut(String($1)) }
 	| LPAREN expression COMMA expression RPAREN
-								{ Pair($2, $4) }
-	| LPAREN RPAREN				{ Unit }
-	| LBRACE RBRACE				{ Record VarMap.empty }
-	| LBRACE record_list RBRACE	{ Record $2 }
-	| MODULE module_body END	{ Module(None, $2) }
+								{ ut(Pair($2, $4)) }
+	| LPAREN RPAREN				{ ut(Unit) }
+	| LBRACE RBRACE				{ ut(Record VarMap.empty) }
+	| LBRACE record_list RBRACE	{ ut(Record $2) }
+	| MODULE module_body END	{ ut(Module(None, $2)) }
 	| MODULE module_type module_body END
-								{ Module(Some $2, $3) }
+								{ ut(Module(Some $2, $3)) }
 
 module_body:
 	| expression				{ [SingleExpression $1] }
@@ -196,7 +200,7 @@ simple_type:
 	| BOOL						{ TBool }
 	| UNIT						{ TUnit }
 	| STRING_T					{ TString }
-	| IDENTIFIER				{ Typevar $1 }
+	| IDENTIFIER				{ TNamedType $1 }
 	| module_type				{ $1 }
 
 module_type:
@@ -210,9 +214,9 @@ module_type_body:
 
 module_type_entry:
 	| DATA IDENTIFIER parameter_list
-								{ ConcreteType($2, $3, TADT [])}
+								{ ConcreteType($2, TForAll($3, TADT [])) }
 	| DATA IDENTIFIER parameter_list EQUALS adt_member adt_list
-								{ ConcreteType($2, $3, TADT($5::$6)) }
+								{ ConcreteType($2, TForAll($3, TADT($5::$6))) }
 	| TYPE IDENTIFIER parameter_list
 								{ AbstractType($2, $3) }
 	| IDENTIFIER COLON type		{ Value($1, $3) }

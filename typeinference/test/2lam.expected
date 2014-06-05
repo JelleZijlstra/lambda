@@ -1,5 +1,5 @@
 %%stdout%%
 Result: module
-	let __result__ = \x. \y : int. x y
+	let __result__ = \x. (\y : int. ((x : int -> int) (y : int) : int) : int -> int)
 end
 %%stderr%%
