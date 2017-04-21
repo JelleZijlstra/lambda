@@ -15,7 +15,6 @@ import Ast
   "let"         { TLet }
   "="           { TEquals }
   "in"          { TIn }
-  "print"       { TPrint }
   "+"           { TPlus }
   "*"           { TMultiply }
   "("           { TLParen }
@@ -28,8 +27,6 @@ expression:
                 { Abstraction $2 $4 }
   | "let" identifier "=" expression "in" expression
                 { Application (Abstraction $2 $6) $4 }
-  | "print" expression
-                { Print $2 }
   | plus_expr   { $1 }
 
 plus_expr:

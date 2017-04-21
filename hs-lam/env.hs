@@ -9,4 +9,4 @@ printB v = do
     return v
 
 env :: Map.Map String Value
-env = Map.fromList [("printX", VBuiltin printB)]
+env = Map.fromList [("print", VBuiltin printB)]

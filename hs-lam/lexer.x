@@ -17,7 +17,6 @@ tokens :-
   "*"           { \s -> TMultiply }
   "let"         { \s -> TLet }
   "in"          { \s -> TIn }
-  "print"       { \s -> TPrint }
   "="           { \s -> TEquals }
   $alpha[$alpha $digit \_ \']*  { \s -> TIdentifier s }
   $digit+       { \s -> TInteger $ read s }
@@ -35,7 +34,6 @@ data Token =
     TMultiply |
     TLet |
     TIn |
-    TPrint |
     TEquals
     deriving (Eq, Show)
 }

@@ -1,22 +1,8 @@
 module Eval where
 
 import Ast
+import Env
 import qualified Data.Map as Map
-
-data EvalResult a =
-    Success a (IO ())
-    | Failure String (IO ())
-
-instance Monad EvalResult where
-    (Success x io) >>= f = case f x of
-        Success x' io' -> Success x' (io >> io')
-        Failure s io' -> Failure s (io >> io')
-    (Failure s io) >>= _ = Failure s io
-    return x = Success x $ return ()
-    fail s = Failure s $ return ()
-
-output :: String -> EvalResult ()
-output s = Success () $ putStrLn s
 
 eval' :: Expr -> Env -> EvalResult Value
 eval' (Var x) e = case Map.lookup x e of
@@ -30,6 +16,7 @@ eval' (Application e1 e2) e = do
     v2 <- eval' e2 e
     case v1 of
         VClosure x e b -> eval' b (Map.insert x v2 e)
+        VBuiltin f -> f v2
         _ -> fail "This expression is not a function; it cannot be applied"
 
 eval' (Integer n) _ = return $ VInteger n
@@ -43,13 +30,8 @@ eval' (Binop b e1 e2) e = do
                   f_of_binop Times = (*)
         (_, _) -> fail "Binop must be of integers"
 
-eval' (Print e) env = do
-    v <- eval' e env
-    output $ show v
-    return v
-
 eval :: Expr -> IO ()
-eval e = break_it $ eval' e Map.empty
+eval e = break_it $ eval' e env
     where
         break_it (Success v io) = do
             io
