@@ -12,12 +12,14 @@ type expr =
 	| Abstraction of string * expr
 	| Application of expr * expr
 	| Integer of int
+	| String of string
 	| Binop of binop * expr * expr
 	| Unop of unop * expr
 
 type value =
 	VClosure of string * value VarMap.t * expr
 	| VInteger of int
+	| VString of string
 	| VDummy of value VarMap.t * expr
 
 val f_of_binop : binop -> int -> int -> int

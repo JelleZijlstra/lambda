@@ -2,10 +2,10 @@
 	open Ast
 %}
 
-%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS TIMES PRINT
+%token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER STRING PLUS LET IN EQUALS TIMES PRINT
 
 %type<Ast.expr> expression simple_expr apply_expr plus_expr times_expr
-%type<string> IDENTIFIER
+%type<string> IDENTIFIER STRING
 %type<int> INTEGER
 
 %start expression
@@ -35,3 +35,4 @@ simple_expr:
 	| LPAREN expression RPAREN	{ $2 }
 	| IDENTIFIER				{ Var($1) }
 	| INTEGER					{ Integer($1) }
+	| STRING 					{ String($1) }

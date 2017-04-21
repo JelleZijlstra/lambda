@@ -12,12 +12,14 @@ type expr =
 	| Abstraction of string * expr
 	| Application of expr * expr
 	| Integer of int
+	| String of string
 	| Binop of binop * expr * expr
 	| Unop of unop * expr
 
 type value =
 	VClosure of string * value VarMap.t * expr
 	| VInteger of int
+	| VString of string
 	| VDummy of value VarMap.t * expr
 
 let f_of_binop op = match op with
@@ -38,6 +40,7 @@ let rec string_of_expr e =
 	match e with
 	| Var x -> x
 	| Integer i -> string_of_int i
+	| String s -> "\"" ^ s ^ "\""
 	| Abstraction(x, e1) -> "\\" ^ x ^ ". " ^ string_of_expr e1
 	| Application(e1, (Application(_, _) as e2)) -> string_of_expr e1 ^ " (" ^ string_of_expr e2 ^ ")"
 	| Application(Abstraction(_, _) as e1, e2) -> "(" ^ string_of_expr e1 ^ ") " ^ string_of_expr e2
@@ -48,4 +51,5 @@ and string_of_value v =
 	match v with
 	| VClosure(x, _, e) -> "\\" ^ x ^ ". " ^ string_of_expr e
 	| VInteger n -> string_of_int n
+	| VString s -> "\"" ^ s ^ "\""
 	| VDummy(_, e) -> string_of_expr e

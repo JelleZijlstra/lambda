@@ -9,6 +9,7 @@ let rec eval (e : expr) (env : value VarMap.t) (s : semantics) : value = match e
 		with Not_found -> failwith("Unbound variable: " ^ x))
 	| Abstraction(x, body) -> VClosure(x, env, body)
 	| Integer n -> VInteger n
+	| String s -> VString s
 	| Binop(op, e1, e2) ->
 		let e1' = eval e1 env s in
 		let e2' = eval e2 env s in

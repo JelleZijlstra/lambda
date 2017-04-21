@@ -6,16 +6,19 @@ exception RuntimeError of string
 type lvalue =
 	LClosure of string * lazy_value ref VarMap.t * expr
 	| LInteger of int
+	| LString of string
 and lazy_value = Unevaluated of lazy_value ref VarMap.t * expr | Evaluated of lvalue
 
 let string_of_lvalue v =
 	match v with
 	| LClosure(x, _, body) -> "\\" ^ x ^ ". " ^ string_of_expr body
 	| LInteger n -> string_of_int n
+	| LString s -> "\"" ^ s ^ "\""
 
 let rec eval (e : expr) (env : lazy_value ref VarMap.t) =
 	match e with
 	| Integer n -> LInteger n
+	| String s -> LString s
 	| Var x -> (try let v = VarMap.find x env in
 		match !v with
 		| Unevaluated(env', e) ->
@@ -48,3 +51,4 @@ let rec eval_lazy (e : expr) : value =
 	match eval e VarMap.empty with
 	| LClosure(arg, _, body) -> VClosure(arg, VarMap.empty, body)
 	| LInteger n -> VInteger n
+	| LString s -> VString s
