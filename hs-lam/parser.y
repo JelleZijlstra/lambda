@@ -30,11 +30,11 @@ expression:
   | plus_expr   { $1 }
 
 plus_expr:
-  times_expr "+" plus_expr { Binop Plus $1 $3 }
+  times_expr "+" plus_expr { makeBinOp "+" $1 $3 }
   | times_expr        { $1 }
 
 times_expr:
-  apply_expr "*" times_expr { Binop Times $1 $3 }
+  apply_expr "*" times_expr { makeBinOp "*" $1 $3 }
   | apply_expr        { $1 }
 
 apply_expr:
@@ -48,4 +48,5 @@ simple_expr:
 
 {
 parseError e = error $ show e
+makeBinOp name l r = Application (Application (Var name) l) r
 }

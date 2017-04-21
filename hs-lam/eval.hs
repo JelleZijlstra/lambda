@@ -21,15 +21,6 @@ eval' (Application e1 e2) e = do
 
 eval' (Integer n) _ = return $ VInteger n
 
-eval' (Binop b e1 e2) e = do
-    v1 <- eval' e1 e
-    v2 <- eval' e2 e
-    case (v1, v2) of
-        (VInteger n1, VInteger n2) -> return $ VInteger $ f_of_binop b n1 n2
-            where f_of_binop Plus = (+)
-                  f_of_binop Times = (*)
-        (_, _) -> fail "Binop must be of integers"
-
 eval :: Expr -> IO ()
 eval e = break_it $ eval' e env
     where
