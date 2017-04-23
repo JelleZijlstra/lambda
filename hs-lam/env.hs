@@ -19,4 +19,6 @@ binOp op v = do
         _ -> fail "binop argument must be an integer"
 
 env :: Map.Map String Value
-env = Map.fromList [("print", VBuiltin printB), ("+", VBuiltin $ binOp (+)), ("*", VBuiltin $ binOp (*))]
+env = Map.fromList [("print", VBuiltin printB)
+                   , ("+", VBuiltin $ binOp (+))
+                   , ("*", VBuiltin $ binOp (*))]
