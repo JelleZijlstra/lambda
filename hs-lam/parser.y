@@ -20,6 +20,7 @@ import Ast
   "("           { TLParen }
   ")"           { TRParen }
   integer       { TInteger $$ }
+  string        { TString $$ }
 %%
 
 expression:
@@ -45,6 +46,7 @@ simple_expr:
   "(" expression ")"  { $2 }
   | identifier       { Var $1 }
   | integer          { Integer $1 }
+  | string           { String $1 }
 
 {
 parseError e = error $ show e

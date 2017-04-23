@@ -21,6 +21,8 @@ eval' (Application e1 e2) e = do
 
 eval' (Integer n) _ = return $ VInteger n
 
+eval' (String s) _ = return $ VString s
+
 eval :: Expr -> IO ()
 eval e = break_it $ eval' e env
     where

@@ -9,11 +9,13 @@ data Expr =
     | Abstraction String Expr
     | Application Expr Expr
     | Integer Int
+    | String String
 
 type Env = Map String Value
 
 data Value =
     VInteger Int
+    | VString String
     | VClosure String Env Expr
     | VBuiltin (Value -> EvalResult Value)
 
@@ -22,11 +24,13 @@ instance Show Expr where
     show (Abstraction s e) = "\\" ++ s ++ ". " ++ show e
     show (Application e1 e2) = show e1 ++ " " ++ show e2
     show (Integer n) = show n
+    show (String s) = "\"" ++ s ++ "\""
 
 instance Show Value where
     show (VInteger n) = show n
     show (VClosure s _ e) = "\\" ++ s ++ ". " ++ show e
     show (VBuiltin _) = "(built-in function)"
+    show (VString s) = s
 
 data EvalResult a =
     Success a (IO ())

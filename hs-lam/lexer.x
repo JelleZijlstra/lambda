@@ -20,6 +20,7 @@ tokens :-
   "="           { \s -> TEquals }
   $alpha[$alpha $digit \_ \']*  { \s -> TIdentifier s }
   $digit+       { \s -> TInteger $ read s }
+  \" [^\"]* \" { TString }
   "#" .*        ;
 {
 
@@ -30,6 +31,7 @@ data Token =
     TDot |
     TIdentifier String |
     TInteger Int |
+    TString String |
     TPlus |
     TMultiply |
     TLet |
