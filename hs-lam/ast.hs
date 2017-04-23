@@ -1,5 +1,7 @@
 module Ast where
 
+import Control.Applicative
+import Control.Monad (liftM, ap)
 import Data.Map
 
 data Expr =
@@ -29,6 +31,13 @@ instance Show Value where
 data EvalResult a =
     Success a (IO ())
     | Failure String (IO ())
+
+instance Functor EvalResult where
+    fmap = liftM
+
+instance Applicative EvalResult where
+    pure = return
+    (<*>) = ap
 
 instance Monad EvalResult where
     (Success x io) >>= f = case f x of
