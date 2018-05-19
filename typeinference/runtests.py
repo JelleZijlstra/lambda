@@ -44,10 +44,19 @@ def parse_expected_file(path: Path) -> Tuple[str, str]:
 
 def run_all_tests() -> None:
     results = []
+    total = 0
+    skipped = 0
+    succeeded = 0
     for test_file in map(Path, sorted(glob.glob("test/*.lam"))):
+        total += 1
         if test_file.stem in BLACKLIST:
+            skipped += 1
             continue
-        results.append(run_test(test_file))
+        res = run_test(test_file)
+        if res:
+            succeeded += 1
+        results.append(res)
+    print(f"{succeeded}/{skipped}/{total}")
     return all(results)
 
 
