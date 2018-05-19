@@ -214,11 +214,21 @@ let add_label (x : string) (label : string) (t : ltype) (s : substitution) : sub
 		| _ -> s
 	with Not_found -> VarMap.add x (TypeWithLabel(x, [(label, t)])) s
 
-let rec unify_types t1 t2 =
+let rec unify_types t1 t2 c =
 	let t1 = prune_type t1 in
 	let t2 = prune_type t2 in
 	match t1, t2 with
 	| _, _ when t1 = t2 -> ()
+	| TNamedType tv, t2 ->
+		(try
+			let t' = Context.find_type_synonym tv c in
+			unify_types t' t2 c
+		with Not_found -> raise(TypeError("Unbound type alias: " ^ tv)))
+	| t1, TNamedType tv ->
+		(try
+			let t' = Context.find_type_synonym tv c in
+			unify_types t1 t' c
+		with Not_found -> raise(TypeError("Unbound type alias: " ^ tv)))
 	| t', Typevar(t, t_ref) when (not(is_free_variable t_ref t')) ->
 		t_ref := Some t'
 	| Typevar(t, t_ref), t' when (not(is_free_variable t_ref t')) ->
@@ -227,16 +237,16 @@ let rec unify_types t1 t2 =
 	| TSum(t0, t1), TSum(t0', t1')
 	| TFunction(t0, t1), TFunction(t0', t1')
 	| TParameterized(t0, t1), TParameterized(t0', t1') ->
-		unify_types t0 t0'; unify_types t1 t1'
+		unify_types t0 t0' c; unify_types t1 t1' c
 	| TRef t0, TRef t1 ->
-		unify_types t0 t1
+		unify_types t0 t1 c
 	| t, (TForAll(_, _) as fa)
 	| (TForAll(_, _) as fa), t ->
-		unify_types t (instantiate fa)
+		unify_types t (instantiate fa) c
 	| TRecord lst1, TRecord lst2 when VarMap.cardinal lst1 = VarMap.cardinal lst2 ->
 		let foldf l t1 _ =
 			let t2 = VarMap.find l lst2 in
-			unify_types t1 t2 in
+			unify_types t1 t2 c in
 		VarMap.fold foldf lst1 ()
 	| _, _ ->
 		let types = string_of_type t1 ^ " and " ^ string_of_type t2 in
@@ -285,12 +295,12 @@ let rec get_kind (t : ltype) (c : Context.t) : ltype * kind =
 			let k = Context.find_kind tv c in
 			let t' = Context.find_type_synonym tv c in
 			t', k
-		with Not_found -> raise(TypeError("Unbound type variable: " ^ tv)))
+		with Not_found -> raise(TypeError("Unbound type alias in kind check: " ^ tv)))
 	| TNewType name ->
 		(try
 			let k = Context.find_kind name c in
 			TNewType name, k
-		with Not_found -> raise(TypeError("Unbound type variable: " ^ name)))
+		with Not_found -> raise(TypeError("Unbound ADT type in kind check: " ^ name)))
 	| Typevar(tv, t_ref) -> (match !t_ref with
 		| None -> Typevar(tv, t_ref), KStar
 		| Some t' ->
@@ -388,6 +398,7 @@ and type_adt (name : string) (params : string list) (lst : adt) (c : Context.t) 
 	let _, kindc, tss, loc = c in
 	let c' = varc, kindc, tss, loc in
 	let c' = Context.add_kind name adt_kind c' in
+	let c' = Context.add_kind qualified_name adt_kind c' in
 	let c' = Context.add_type_synonym name (TNewType qualified_name) c' in
 	(new_lst, c')
 
@@ -427,7 +438,7 @@ let check_module_type (interface : module_type_entry list) (actual : module_type
 			| _ -> failwith "impossible")
 		| Value(x, tp) ->
 			let tp' = VarMap.find x vmap in
-			unify_types tp tp';
+			unify_types tp tp' (Context.empty "module");
 			entry::t
 	with Not_found ->
 		let text = string_of_module_type_entry entry in
@@ -440,7 +451,7 @@ let rec get_type ((e, given_t) : typed_expr) (c : Context.t) : ltype * typed_exp
 	let inferred_t, e' = get_type_expr e c in
 	(match !given_t with
 	| None -> ()
-	| Some t' -> unify_types t' inferred_t);
+	| Some t' -> unify_types t' inferred_t c);
 	let inferred_t = prune_type inferred_t in
 	given_t := Some inferred_t;
 	(inferred_t, (e', given_t))
@@ -466,21 +477,21 @@ and get_type_expr (e : expr) (c : Context.t) : ltype * expr =
 		t2, In(LetRec(x, t, e1'), e2')
 	| Binop(op, e1, e2) ->
 		let t1, e1 = get_type e1 c in
-		unify_types t1 TInt;
+		unify_types t1 TInt c;
 		let t2, e2 = get_type e2 c in
-		unify_types t2 TInt;
+		unify_types t2 TInt c;
 		TInt, Binop(op, e1, e2)
 	| Boolbinop(op, e1, e2) ->
 		let t1, e1 = get_type e1 c in
-		unify_types t1 TInt;
+		unify_types t1 TInt c;
 		let t2, e2 = get_type e2 c in
-		unify_types t2 TInt;
+		unify_types t2 TInt c;
 		TBool, Boolbinop(op, e1, e2)
 	| Application(e1, e2) ->
 		let t1, e1 = get_type e1 c in
 		let t2, e2 = get_type e2 c in
 		let new_type = Ast.new_typevar() in
-		unify_types t1 (TFunction(t2, new_type));
+		unify_types t1 (TFunction(t2, new_type)) c;
 		new_type, Application(e1, e2)
 	| Abstraction(arg, t, body) ->
 		let t' = get_optional_type t c in
@@ -489,14 +500,14 @@ and get_type_expr (e : expr) (c : Context.t) : ltype * expr =
 	| Fix e ->
 		let t, e = get_type e c in
 		let new_type = Ast.new_typevar() in
-		unify_types t (TFunction(new_type, new_type));
+		unify_types t (TFunction(new_type, new_type)) c;
 		new_type, Fix e
 	| If(e1, e2, e3) ->
 		let t1, e1 = get_type e1 c in
-		unify_types t1 TBool;
+		unify_types t1 TBool c;
 		let t2, e2 = get_type e2 c in
 		let t3, e3 = get_type e3 c in
-		unify_types t2 t3;
+		unify_types t2 t3 c;
 		t2, If(e1, e2, e3)
 	| Pair(e1, e2) ->
 		let t1, e1 = get_type e1 c in
@@ -506,7 +517,7 @@ and get_type_expr (e : expr) (c : Context.t) : ltype * expr =
 		let t, e = get_type e c in
 		let left_typevar = Ast.new_typevar() in
 		let right_typevar = Ast.new_typevar() in
-		unify_types t (TProduct(left_typevar, right_typevar));
+		unify_types t (TProduct(left_typevar, right_typevar)) c;
 		let my_type = if b then right_typevar else left_typevar in
 		my_type, Projection(b, e)
 	| Injection(b, e) ->
@@ -521,25 +532,25 @@ and get_type_expr (e : expr) (c : Context.t) : ltype * expr =
 		let tv2a = Ast.new_typevar() in
 		let tv3a = Ast.new_typevar() in
 		let tv_res = Ast.new_typevar() in
-		unify_types t1 (TSum(tv2a, tv3a));
-		unify_types t2 (TFunction(tv2a, tv_res));
-		unify_types t3 (TFunction(tv3a, tv_res));
+		unify_types t1 (TSum(tv2a, tv3a)) c;
+		unify_types t2 (TFunction(tv2a, tv_res)) c;
+		unify_types t3 (TFunction(tv3a, tv_res)) c;
 		tv_res, Case(e1, e2, e3)
 	| Allocation(e) ->
 		let t, e = get_type e c in TRef t, Allocation e
 	| Dereference(e) ->
 		let t, e = get_type e c in
 		let tv = Ast.new_typevar() in
-		unify_types t (TRef tv);
+		unify_types t (TRef tv) c;
 		tv, Dereference e
 	| Assignment(e1, e2) ->
 		let t1, e1 = get_type e1 c in
 		let t2, e2 = get_type e2 c in
-		unify_types t1 (TRef t2);
+		unify_types t1 (TRef t2) c;
 		TUnit, Assignment(e1, e2)
 	| Sequence(e1, e2) ->
 		let t1, e1 = get_type e1 c in
-		unify_types t1 TUnit;
+		unify_types t1 TUnit c;
 		let t2, e2 = get_type e2 c in
 		t2, Sequence(e1, e2)
  	| Record lst ->
@@ -599,33 +610,33 @@ and get_type_expr (e : expr) (c : Context.t) : ltype * expr =
 			let rec type_pattern p t = match p with
 				| PAnything -> p, []
 				| PVariable x -> p, [(x, t)]
-				| PInt _ -> unify_types t TInt; (p, [])
-				| PBool _ -> unify_types t TBool; (p, [])
-				| PString _ -> unify_types t TString; (p, [])
+				| PInt _ -> unify_types t TInt c; (p, [])
+				| PBool _ -> unify_types t TBool c; (p, [])
+				| PString _ -> unify_types t TString c; (p, [])
 				| PPair(p1, p2) ->
 					let t1 = Ast.new_typevar() in
 					let t2 = Ast.new_typevar() in
 					let p1, vars1 = type_pattern p1 t1 in
 					let p2, vars2 = type_pattern p2 t2 in
-					unify_types t (TProduct(t1, t2));
+					unify_types t (TProduct(t1, t2)) c;
 					(PPair(p1, p2), vars1 @ vars2)
 				| PConstructor x ->
 					let xt = (try instantiate (Context.find_var x c)
 						with Not_found -> raise(TypeError("Unbound constructor " ^ x))) in
-					unify_types t xt;
+					unify_types t xt c;
 					(p, [])
 				| PApplication(p1, p2) ->
 					let t1 = Ast.new_typevar() in
 					let t2 = Ast.new_typevar() in
 					let p1, vars1 = type_pattern p1 t1 in
 					let p2, vars2 = type_pattern p2 t2 in
-					unify_types t1 (TFunction(t2, t));
+					unify_types t1 (TFunction(t2, t)) c;
 					PApplication(p1, p2), vars1 @ vars2
 				| PGuarded(p, e) ->
 					let p, vars = type_pattern p t in
 					let new_tc = add_list c vars in
 					let t', e' = get_type e new_tc in
-					unify_types t' TBool;
+					unify_types t' TBool c;
 					(PGuarded(p, e'), vars)
 				| PAs(p, x) ->
 					let p, vars = type_pattern p t in
@@ -634,7 +645,7 @@ and get_type_expr (e : expr) (c : Context.t) : ltype * expr =
 			let p, vars = type_pattern p t1 in
 			let new_tc = add_list c vars in
 			let t', e = get_type e new_tc in
-			unify_types res_tv t';
+			unify_types res_tv t' c;
 			(p, e)::lst in
 		let lst = List.fold_right foldf lst [] in
 		res_tv, Match(e1, lst)
@@ -698,7 +709,7 @@ and get_type_let (e : typed_expr) (x : string) (t : ltype option ref) (c : Conte
 	let t1, e1 = get_type e c in
 	let t1' = quantify c t1 in
 	let t' = get_optional_type t c in
-	unify_types t' t1';
+	unify_types t' t1' c;
 	let result_t = prune_type t' in
 	t := Some result_t;
 	let new_tc = Context.add_var x result_t c in
@@ -708,7 +719,7 @@ and get_type_let_rec (e : typed_expr) (x : string) (t : ltype option ref) (c : C
 	let e1_c = Context.add_var x t' c in
 	let t1, e1 = get_type e e1_c in
 	let t1' = quantify e1_c t1 in
-	unify_types t' t1';
+	unify_types t' t1' c;
 	let result_t = prune_type t' in
 	t := Some result_t;
 	let new_tc = Context.add_var x result_t c in

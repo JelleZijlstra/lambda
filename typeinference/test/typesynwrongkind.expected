@@ -1,0 +1,3 @@
+%%stdout%%
+Error: Cannot unify types: new:either/0 and new:either/0 'typevar/0
+%%stderr%%

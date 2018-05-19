@@ -17,6 +17,7 @@ BLACKLIST = {
     "aspattern",
     "permutations",
     "importedcons",
+    "wlabel",  # relies on unimplemented behavior
 }
 
 

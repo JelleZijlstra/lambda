@@ -1,0 +1,5 @@
+data either a b = Left a | Right b in
+type with_err_code = either int in
+
+let hd : with_err_code = Right 3 in
+()
