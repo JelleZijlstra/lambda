@@ -219,7 +219,8 @@ let rec unify_types t1 t2 =
 	let t2 = prune_type t2 in
 	match t1, t2 with
 	| _, _ when t1 = t2 -> ()
-	| t', Typevar(t, t_ref)
+	| t', Typevar(t, t_ref) when (not(is_free_variable t_ref t')) ->
+		t_ref := Some t'
 	| Typevar(t, t_ref), t' when (not(is_free_variable t_ref t')) ->
 		t_ref := Some t'
 	| TProduct(t0, t1), TProduct(t0', t1')
