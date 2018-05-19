@@ -520,6 +520,9 @@ and get_type_expr (e : expr) (c : Context.t) : ltype * expr =
 		unify_types t (TProduct(left_typevar, right_typevar)) c;
 		let my_type = if b then right_typevar else left_typevar in
 		my_type, Projection(b, e)
+	| RevealType(e) ->
+		let t, e = get_type e c in
+		t, RevealType(e)
 	| Injection(b, e) ->
 		let t, e = get_type e c in
 		let other_typevar = Ast.new_typevar() in

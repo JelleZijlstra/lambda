@@ -38,6 +38,7 @@ let rec desugar (e, t : typed_expr) (vm : desugar_ctxt) : typed_expr = (match e 
 	| Pair(e1, e2) -> Pair(desugar e1 vm, desugar e2 vm)
 	| Projection(b, e) -> Projection(b, desugar e vm)
 	| Injection(b, e) -> Injection(b, desugar e vm)
+	| RevealType(e) -> RevealType(desugar e vm)
 	| Case(e1, e2, e3) -> Case(desugar e1 vm, desugar e2 vm, desugar e3 vm)
 	| Allocation e -> Allocation(desugar e vm)
 	| Assignment(e1, e2) -> Assignment(desugar e1 vm, desugar e2 vm)
@@ -147,6 +148,7 @@ let rec compile_rec (e, _) = match e with
 	| Pair(e1, e2) -> "[" ^ compile_rec e1 ^ ", " ^ compile_rec e2 ^ "]"
 	| Projection(false, e) -> "(" ^ compile_rec e ^ "[0])"
 	| Projection(true, e) -> "(" ^ compile_rec e ^ "[1])"
+	| RevealType(e) -> "(function(e) { console.log(typeof e); return e; }(" ^ compile_rec e ^ ")"
 	| Unit -> "null"
 	| Injection(b, e) -> "[" ^ (if b then "true" else "false") ^ ", " ^ compile_rec e ^ "]"
 	| Case(e1, e2, e3) -> "((function(x) { return x[0] ? (" ^ compile_rec e3 ^ "(x[1])) : ("
@@ -205,6 +207,7 @@ let rec compile_rec (e, _) = match e with
 	| Projection(true, e) -> "(snd " ^ compile_rec e ^ ")"
 	| Injection(b, e) -> failwith "Not implemented"
 	| Case(e1, e2, e3) -> failwith "Not implemented"
+	| RevealType(e) -> failwith "Not implemented"
 	| Allocation e -> "(ref " ^ compile_rec e ^ ")"
 	| Assignment(e1, e2) -> "(" ^ compile_rec e1 ^ " := " ^ compile_rec e2 ^ ")"
 	| Dereference e -> "(!" ^ compile_rec e ^ ")"
@@ -254,6 +257,7 @@ let rec compile_rec (e, _) = match e with
 	| Projection(false, e) -> "(" ^ compile_rec e ^ "->0)"
 	| Projection(true, e) -> "(" ^ compile_rec e ^ "->1)"
 	| Injection(b, e) -> "(" ^ (if b then "true" else "false") ^ ", " ^ compile_rec e ^ ")"
+	| RevealType(e) -> failwith "Not implemented"
 	| Case(e1, e2, e3) ->
 		let x = make_new_var () in
 		"((" ^ x ^ " => (if " ^ x ^ "->0; " ^ compile_rec e3 ^ "; else "

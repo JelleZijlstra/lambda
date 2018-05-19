@@ -54,6 +54,7 @@ type expr =
 	| Fix of typed_expr
 	| Pair of typed_expr * typed_expr
 	| Projection of bool * typed_expr
+	| RevealType of typed_expr
 	| Case of typed_expr * typed_expr * typed_expr
 	| Injection of bool * typed_expr
 	| Sequence of typed_expr * typed_expr
@@ -208,6 +209,7 @@ let rec string_of_expr e =
 	| Pair(e1, e2) -> "(" ^ string_of_typed_expr e1 ^ ", " ^ string_of_typed_expr e2 ^ ")"
 	| Projection(false, e) -> "fst " ^ string_of_typed_expr e
 	| Projection(true, e) -> "snd " ^ string_of_typed_expr e
+	| RevealType(e) -> "reveal_type " ^ string_of_typed_expr e
 	| Case(e1, e2, e3) -> "case " ^ string_of_typed_expr e1 ^ " of " ^ string_of_typed_expr e2 ^ " | " ^ string_of_typed_expr e3
 	| Injection(false, e) -> "inl " ^ string_of_typed_expr e
 	| Injection(true, e) -> "inr " ^ string_of_typed_expr e

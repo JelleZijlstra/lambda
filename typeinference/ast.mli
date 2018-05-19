@@ -52,6 +52,7 @@ type expr =
 	| Fix of typed_expr
 	| Pair of typed_expr * typed_expr
 	| Projection of bool * typed_expr
+	| RevealType of typed_expr
 	| Case of typed_expr * typed_expr * typed_expr
 	| Injection of bool * typed_expr
 	| Sequence of typed_expr * typed_expr

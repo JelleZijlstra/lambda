@@ -21,7 +21,7 @@
 
 %token BACKSLASH DOT LPAREN RPAREN IDENTIFIER EOF INTEGER PLUS LET IN EQUALS
 %token TIMES INT ARROW COLON FIX REC IF THEN ELSE GREATER LESS BOOL MINUS
-%token COMMA FST SND UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
+%token COMMA FST SND REVEAL_TYPE UNIT BOOLEAN CASE OF BAR INL INR SEMICOLON BANG ASSIGN REF
 %token LBRACE RBRACE TYPE CONSTRUCTOR MATCH WITH UNDERSCORE DATA MODULE OPEN
 %token INTERFACE IMPORT END DOUBLESEMICOLON WHEN PERCENT SLASH AS FORALL STRING STRING_T
 
@@ -57,6 +57,7 @@ single_expr:
 	| in_expr IN single_expr	{ ut(In($1, $3)) }
 	| FST single_expr			{ ut(Projection(false, $2)) }
 	| SND single_expr			{ ut(Projection(true, $2)) }
+	| REVEAL_TYPE single_expr   { ut(RevealType($2)) }
 	| IF expression THEN expression ELSE single_expr
 								{ ut(If($2, $4, $6)) }
 	| CASE expression OF expression BAR single_expr

@@ -44,6 +44,8 @@ rule token = parse
 		{ ELSE }
 | "fst"	{ FST }
 | "snd"	{ SND }
+| "reveal_type"
+		{ REVEAL_TYPE }
 | "case"
 		{ CASE }
 | "of"	{ OF }

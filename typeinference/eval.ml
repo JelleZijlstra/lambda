@@ -77,6 +77,12 @@ let rec eval' (e, t : typed_expr) (s : bound_vars) : value = match e with
 		| VPair(e1, e2) -> if b then e2 else e1
 		| _ -> failwith "This expression is not a product; it cannot be projected")
 	| Injection(b, e) -> VInjection(b, eval' e s)
+	| RevealType(e) ->
+		let v = eval' e s in
+		(match !t with
+			| Some t' -> Printf.printf "%s\n" (string_of_type t')
+			| None -> Printf.printf "cannot determine type of %s\n" (string_of_value v));
+		v
 	| Case(e1, e2, e3) -> (match eval' e1 s with
 		| VInjection(false, e') -> eval' (Application(e2, (Dummy e', ref None)), ref None) s
 		| VInjection(true, e') -> eval' (Application(e3, (Dummy e', ref None)), ref None) s
