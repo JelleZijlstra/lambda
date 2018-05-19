@@ -14,4 +14,4 @@ let g = \x.
 	} in
 	(f' (Some true), f' (None x))
 in
-((f, g), (f 3, g 4))
+(f 3, g 4)
