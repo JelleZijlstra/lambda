@@ -238,10 +238,6 @@ let rec unify_types t1 t2 =
 			let t2 = VarMap.find l lst2 in
 			unify_types t1 t2 in
 		VarMap.fold foldf lst1 ()
-	| t', Typevar(t, t_ref)
-	| Typevar(t, t_ref), t' ->
-		let types = string_of_type t1 ^ " and " ^ string_of_type t2 in
-		raise(ImpossibleConstraint("Found recursion: " ^ types))
 	| _, _ ->
 		let types = string_of_type t1 ^ " and " ^ string_of_type t2 in
 		raise(ImpossibleConstraint("Cannot unify types: " ^ types))
