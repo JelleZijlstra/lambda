@@ -1,6 +1,6 @@
 %%stdout%%
 Result: module
-	let f = \a. \b : 'typevar1. a + b
+	let f = \a. (\b : int. ((a : int) + (b : int) : int) : int -> int)
 	let __result__ = 3
 end
 %%stderr%%

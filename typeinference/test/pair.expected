@@ -2,6 +2,6 @@
 1
 2
 Result: module
-	let __result__ = (1, \x. 2)
+	let __result__ = (1, \x. (2 : int))
 end
 %%stderr%%
