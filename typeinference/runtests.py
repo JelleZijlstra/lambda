@@ -8,6 +8,7 @@ import sys
 from typing import Tuple, Dict, List
 
 BLACKLIST = {
+    # Run forever for some reason
     "echo_module",
     "listm",
     "use_module",
@@ -17,7 +18,10 @@ BLACKLIST = {
     "aspattern",
     "permutations",
     "importedcons",
-    "wlabel",  # relies on unimplemented behavior
+    # Rely on unimplemented records behavior
+    "wlabel",
+    "twoinsts",
+    "subtype",
 }
 
 
