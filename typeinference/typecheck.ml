@@ -743,25 +743,9 @@ and get_type_import (m : string) (c : Context.t) =
 	Let(m, t, e), tc
 
 let typecheck e verbose loc =
+	try
 		let t, e' = get_type e (initial_context loc) in
 		Result e'
-(* 	try
-		let t, e' = get_type e (initial_context loc) in
-		Result e'
-		(try
-			if verbose then (Printf.printf "Initial type: %s\n" (string_of_type t);
-				Printf.printf "Constraints:\n%s\n" (print_cs cs);
-				Printf.printf "Kind constraints:\n%s\n" (print_ks ks));
-			let subst' = unify_kinds ks in
-			let subst = unify cs in
-			if verbose then
-				let res_t = apply_substitution subst t VariableSet.empty in
-				Printf.printf "Kind substitution:\n%s" (print_ksubstitution subst');
-				Printf.printf "Substitution:\n%s" (print_substitution subst);
-				Printf.printf "Final type: %s\n" (string_of_type res_t)
-			else ignore subst;
-			Result e'
 	with
 		| ImpossibleConstraint e -> TError e
 		| TypeError e -> TError e
- *)
