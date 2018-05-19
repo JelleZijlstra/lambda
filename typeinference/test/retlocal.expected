@@ -1,5 +1,5 @@
 %%stdout%%
 Result: module
-	let __result__ = (\x. type option a = None  | Some 'a in Some x, \x. type option a b = None  | Some 'b 'a in Some x true)
+	let __result__ = (\x. (type option a = None  | Some a in ((Some : 'typevar/1 -> option/0 'typevar/1) (x : 'typevar/1) : option/0 'typevar/1) : option/0 'typevar/1), \x. (type option a b = None  | Some b a in (((Some : 'typevar/5 -> bool -> option/1 'typevar/5 bool) (x : 'typevar/5) : bool -> option/1 'typevar/5 bool) (true : bool) : option/1 'typevar/5 bool) : option/1 'typevar/5 bool))
 end
 %%stderr%%
